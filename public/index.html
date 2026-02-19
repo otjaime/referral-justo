@@ -49,7 +49,8 @@
 
   <script type="text/babel">
     const { useState, useEffect, useContext, createContext, useCallback } = React;
-    const { BrowserRouter, Routes, Route, Navigate, Link, useNavigate, useLocation, Outlet } = ReactRouterDOM;
+    const { Routes, Route, Navigate, Outlet, useNavigate, useLocation } = ReactRouter;
+    const { BrowserRouter, Link } = ReactRouterDOM;
 
     // ─── API Helper ──────────────────────────────────────
     async function api(path, options = {}) {
