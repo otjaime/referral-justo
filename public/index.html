@@ -597,6 +597,8 @@
       var code = props.code;
       var _rs = useState('loading'), refStatus = _rs[0], setRefStatus = _rs[1];
       var _rn = useState(''), referrerName = _rn[0], setReferrerName = _rn[1];
+      var _bd = useState(null), benefitData = _bd[0], setBenefitData = _bd[1];
+      var _tr = useState(0), totalReferrals = _tr[0], setTotalReferrals = _tr[1];
       var _step = useState(0), step = _step[0], setStep = _step[1];
       var _f = useState({ restaurantName: '', name: '', email: '', password: '' }), form = _f[0], setForm = _f[1];
       var _ld = useState(false), loading = _ld[0], setLoading = _ld[1];
@@ -605,7 +607,12 @@
       useEffect(function() {
         if (!code) { setRefStatus('invalid'); return; }
         api('/referrals/validate/' + encodeURIComponent(code))
-          .then(function(data) { setRefStatus('valid'); setReferrerName(data.referrerName); })
+          .then(function(data) {
+            setRefStatus('valid');
+            setReferrerName(data.referrerName);
+            setBenefitData(data.referredBenefit);
+            setTotalReferrals(data.totalReferrals || 0);
+          })
           .catch(function() { setRefStatus('invalid'); });
       }, [code]);
 
@@ -644,10 +651,13 @@
         </div>
       </div>`;
 
-      // Step indicators
-      var stepLabels = ['Bienvenida', 'Tu Restaurante', 'Tu Cuenta'];
+      var benefitHeadline = benefitData ? benefitData.headline : 'Beneficios exclusivos';
+      var referrerInitial = referrerName ? referrerName.charAt(0).toUpperCase() : '?';
 
-      var stepBar = html`<div className="flex items-center justify-center gap-2 mb-6">
+      // Step indicators
+      var stepLabels = ['Tu beneficio', 'Tu restaurante', 'Tu cuenta'];
+
+      var stepBar = html`<div className="flex items-center justify-center gap-2 mb-8">
         ${stepLabels.map(function(label, i) {
           var active = i === step;
           var done = i < step;
@@ -663,37 +673,56 @@
         })}
       </div>`;
 
-      // Step 0: Welcome
+      // Step 0: Welcome — Hero benefit + who invites + social proof
       if (step === 0) return html`<div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-justo-600 to-ocean-600 p-4">
         <div className="w-full max-w-lg">
           <div className="text-center mb-6">
             <h1 className="text-4xl font-bold text-white">Justo</h1>
           </div>
-          <div className="bg-white rounded-2xl shadow-xl p-8">
-            ${stepBar}
-            <div className="text-center mb-6">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-justo-100 text-justo-600 mb-4">
-                <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-              </div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Lleva tu restaurante al siguiente nivel</h2>
-              <p className="text-gray-500">${referrerName} te invita a unirte a la plataforma de Justo</p>
-            </div>
-            <div className="space-y-3 mb-6">
-              <div className="flex items-start gap-3 p-3 bg-justo-50 rounded-lg">
-                <div className="text-justo-500 mt-0.5"><svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg></div>
-                <div><p className="text-sm font-medium text-gray-900">Mayor visibilidad</p><p className="text-xs text-gray-500">Llega a mas clientes a traves de la plataforma</p></div>
-              </div>
-              <div className="flex items-start gap-3 p-3 bg-justo-50 rounded-lg">
-                <div className="text-justo-500 mt-0.5"><svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg></div>
-                <div><p className="text-sm font-medium text-gray-900">Beneficios por referido</p><p className="text-xs text-gray-500">Obtiene recompensas al registrarte con esta invitacion</p></div>
-              </div>
-              <div className="flex items-start gap-3 p-3 bg-justo-50 rounded-lg">
-                <div className="text-justo-500 mt-0.5"><svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg></div>
-                <div><p className="text-sm font-medium text-gray-900">Facil y rapido</p><p className="text-xs text-gray-500">Registra tu restaurante en menos de 2 minutos</p></div>
+          <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+            <div className="p-8 pb-0">
+              ${stepBar}
+
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-justo-400 to-ocean-500 flex items-center justify-center text-white text-lg font-bold flex-shrink-0">${referrerInitial}</div>
+                <div>
+                  <p className="text-sm text-gray-900 font-medium">${referrerName} te invita</p>
+                  <p className="text-xs text-gray-500">a registrar tu restaurante en Justo</p>
+                </div>
               </div>
             </div>
-            <button onClick=${function() { setStep(1); }} className="w-full bg-justo-500 hover:bg-justo-600 text-white font-medium py-3 rounded-lg transition-colors text-lg">Comenzar</button>
-            <p className="text-center text-sm text-gray-500 mt-4">Ya tienes cuenta? <a href="#/login" className="text-justo-600 font-medium hover:underline">Iniciar Sesion</a></p>
+
+            <div className="mx-6 rounded-xl bg-gradient-to-r from-justo-500 to-ocean-500 p-6 text-center text-white shadow-lg relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -translate-y-8 translate-x-8"></div>
+              <div className="absolute bottom-0 left-0 w-16 h-16 bg-white/10 rounded-full translate-y-6 -translate-x-6"></div>
+              <p className="text-white/80 text-sm font-medium mb-1 relative">Tu beneficio por registrarte</p>
+              <p className="text-3xl sm:text-4xl font-bold relative">${benefitHeadline}</p>
+              <div className="inline-block mt-3 bg-white/20 backdrop-blur-sm rounded-full px-3 py-1 text-xs font-medium relative">Al unirte con esta invitacion</div>
+            </div>
+
+            <div className="p-8 pt-6 space-y-6">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-gray-50 rounded-xl p-4 text-center">
+                  <div className="text-justo-500 mb-2 flex justify-center"><svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg></div>
+                  <p className="text-sm font-semibold text-gray-900">Mayor visibilidad</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Mas clientes te encuentran</p>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-4 text-center">
+                  <div className="text-green-500 mb-2 flex justify-center"><svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
+                  <p className="text-sm font-semibold text-gray-900">0% comision</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Tu primer mes sin costo</p>
+                </div>
+              </div>
+
+              ${totalReferrals > 0 && html`<div className="flex items-center justify-center gap-2 text-sm text-gray-500">
+                <svg className="h-4 w-4 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/></svg>
+                <span>${totalReferrals} ${totalReferrals === 1 ? 'restaurante ya se unio' : 'restaurantes ya se unieron'} con Justo</span>
+              </div>`}
+
+              <button onClick=${function() { setStep(1); }} className="w-full bg-justo-500 hover:bg-justo-600 text-white font-semibold py-3.5 rounded-xl transition-colors text-lg shadow-md shadow-justo-500/25">Reclamar mi beneficio</button>
+
+              <p className="text-center text-xs text-gray-400">Registro en menos de 2 minutos · Ya tienes cuenta? <a href="#/login" className="text-justo-600 font-medium hover:underline">Inicia sesion</a></p>
+            </div>
           </div>
         </div>
       </div>`;

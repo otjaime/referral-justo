@@ -64,10 +64,23 @@ export class ReferralService {
       throw new ValidationError('Referral code has reached its maximum uses');
     }
 
+    const totalReferrals = await prisma.referral.count({
+      where: { referralCode: { referrerUserId: referralCode.referrer.id } },
+    });
+
     return {
       code: referralCode.code,
       referrerName: referralCode.referrer.name,
       valid: true,
+      referredBenefit: {
+        headline: config.REFERRAL_REWARD_REFERRED_DESCRIPTION,
+        type: config.REFERRAL_REWARD_REFERRED_TYPE.toUpperCase(),
+      },
+      referrerBenefit: {
+        type: config.REFERRAL_REWARD_REFERRER_TYPE.toUpperCase(),
+        amount: config.REFERRAL_REWARD_REFERRER_AMOUNT,
+      },
+      totalReferrals,
     };
   }
 
