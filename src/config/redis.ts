@@ -11,4 +11,6 @@ function parseRedisUrl(url: string) {
   };
 }
 
-export const redisConnectionOptions = parseRedisUrl(config.REDIS_URL);
+export const redisConnectionOptions = config.REDIS_URL
+  ? parseRedisUrl(config.REDIS_URL)
+  : null;

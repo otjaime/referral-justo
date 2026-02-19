@@ -5,6 +5,11 @@ import { JOB_NAMES, EmitRewardsPayload } from '../jobs/types';
 import { RewardService } from '../modules/reward/reward.service';
 import { logger } from '../utils/logger';
 
+if (!redisConnectionOptions) {
+  logger.error('REDIS_URL is required to run the worker. Exiting.');
+  process.exit(1);
+}
+
 const rewardService = new RewardService();
 
 const worker = new Worker(

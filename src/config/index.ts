@@ -5,8 +5,8 @@ dotenv.config();
 
 const envSchema = z.object({
   DATABASE_URL: z.string(),
-  REDIS_URL: z.string().default('redis://localhost:6379'),
-  JWT_SECRET: z.string().min(8),
+  REDIS_URL: z.string().optional(),
+  JWT_SECRET: z.string().min(8).default('change-me-in-production-min8'),
   JWT_EXPIRES_IN: z.string().default('7d'),
   PORT: z.coerce.number().default(3000),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
