@@ -3,8 +3,8 @@ import jwt from 'jsonwebtoken';
 import { UserRole } from '@prisma/client';
 import prisma from '../../config/prisma';
 import { config } from '../../config';
-import { ConflictError, UnauthorizedError } from '../../utils/errors';
-import { RegisterInput, LoginInput } from './auth.schema';
+import { ConflictError, UnauthorizedError, NotFoundError, ValidationError } from '../../utils/errors';
+import { RegisterInput, LoginInput, RegisterWithReferralInput } from './auth.schema';
 import { JwtPayload } from '../../types/express';
 
 export class AuthService {
@@ -47,6 +47,70 @@ export class AuthService {
 
     return {
       user: { id: user.id, email: user.email, name: user.name, role: user.role },
+      token,
+    };
+  }
+
+  async registerWithReferral(data: RegisterWithReferralInput) {
+    const existing = await prisma.user.findUnique({ where: { email: data.email } });
+    if (existing) {
+      throw new ConflictError('Email already registered');
+    }
+
+    const referralCode = await prisma.referralCode.findUnique({
+      where: { code: data.referralCode },
+    });
+
+    if (!referralCode) {
+      throw new NotFoundError('Referral code not found');
+    }
+
+    if (referralCode.expiresAt && referralCode.expiresAt < new Date()) {
+      throw new ValidationError('Referral code has expired');
+    }
+
+    if (referralCode.maxUses !== null && referralCode.useCount >= referralCode.maxUses) {
+      throw new ValidationError('Referral code has reached its maximum uses');
+    }
+
+    const hashedPassword = await bcrypt.hash(data.password, 10);
+
+    const result = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          email: data.email,
+          password: hashedPassword,
+          name: data.name,
+        },
+      });
+
+      const restaurant = await tx.restaurant.create({
+        data: {
+          name: data.restaurantName,
+          ownerId: user.id,
+        },
+      });
+
+      await tx.referralCode.update({
+        where: { id: referralCode.id },
+        data: { useCount: { increment: 1 } },
+      });
+
+      await tx.referral.create({
+        data: {
+          referralCodeId: referralCode.id,
+          referredRestaurantId: restaurant.id,
+          status: 'PENDING',
+        },
+      });
+
+      return user;
+    });
+
+    const token = this.generateToken(result.id, result.role);
+
+    return {
+      user: { id: result.id, email: result.email, name: result.name, role: result.role },
       token,
     };
   }

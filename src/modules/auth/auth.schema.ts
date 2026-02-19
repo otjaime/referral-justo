@@ -11,5 +11,14 @@ export const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+export const registerWithReferralSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6),
+  name: z.string().min(1),
+  restaurantName: z.string().min(1),
+  referralCode: z.string().min(1),
+});
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+export type RegisterWithReferralInput = z.infer<typeof registerWithReferralSchema>;
