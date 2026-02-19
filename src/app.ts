@@ -7,6 +7,7 @@ import { authRoutes } from './modules/auth/auth.routes';
 import { referralRoutes } from './modules/referral/referral.routes';
 import { restaurantRoutes } from './modules/restaurant/restaurant.routes';
 import { rewardRoutes } from './modules/reward/reward.routes';
+import { analyticsRoutes } from './modules/analytics/analytics.routes';
 
 const app = express();
 
@@ -33,6 +34,7 @@ app.use('/auth', authRoutes);
 app.use('/referrals', referralRoutes);
 app.use('/restaurants', restaurantRoutes);
 app.use('/rewards', rewardRoutes);
+app.use('/analytics', analyticsRoutes);
 
 // SPA catch-all (after API routes, before error handler)
 app.get('{*path}', (_req, res) => {

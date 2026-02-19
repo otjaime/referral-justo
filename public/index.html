@@ -290,6 +290,21 @@
 
       var activeRewards = rewards.filter(function(r) { return r.status === 'ISSUED'; }).length;
       var redeemedRewards = rewards.filter(function(r) { return r.status === 'REDEEMED'; }).length;
+      var totalEarned = rewards.reduce(function(sum, r) { return sum + (r.amount || 0); }, 0);
+
+      // Mini funnel data
+      var funnelSent = sent.length;
+      var funnelQualified = sent.filter(function(r) { return r.status === 'QUALIFIED' || r.status === 'REWARDED'; }).length;
+      var funnelRewarded = sent.filter(function(r) { return r.status === 'REWARDED'; }).length;
+
+      // Milestone logic
+      var qualifiedCount = funnelQualified;
+      var milestoneLevel, milestoneLabel, milestoneNext, milestoneProgress;
+      if (qualifiedCount >= 10) { milestoneLevel = 'Embajador Justo'; milestoneLabel = 'Has alcanzado el maximo nivel!'; milestoneNext = 0; milestoneProgress = 100; }
+      else if (qualifiedCount >= 5) { milestoneLevel = 'Top Referidor'; milestoneLabel = 'Faltan ' + (10 - qualifiedCount) + ' referidos exitosos para Embajador'; milestoneNext = 10; milestoneProgress = Math.round((qualifiedCount / 10) * 100); }
+      else if (qualifiedCount >= 3) { milestoneLevel = 'Vas por buen camino'; milestoneLabel = 'Faltan ' + (5 - qualifiedCount) + ' referidos exitosos para Top Referidor'; milestoneNext = 5; milestoneProgress = Math.round((qualifiedCount / 5) * 100); }
+      else if (qualifiedCount >= 1) { milestoneLevel = 'Tu primer referido!'; milestoneLabel = 'Faltan ' + (3 - qualifiedCount) + ' referidos exitosos para el siguiente nivel'; milestoneNext = 3; milestoneProgress = Math.round((qualifiedCount / 3) * 100); }
+      else { milestoneLevel = 'Comienza a referir'; milestoneLabel = 'Comparte tu codigo para ganar recompensas'; milestoneNext = 1; milestoneProgress = 0; }
 
       return html`<div className="space-y-6">
         <h2 className="text-2xl font-bold text-gray-900">Hola, ${auth.user.name}</h2>
@@ -313,22 +328,78 @@
               </button>
             </div>
           </div>
-          ${code && html`<p className="text-white/70 text-sm mt-3">Usado ${code.useCount} ${code.useCount === 1 ? 'vez' : 'veces'}</p>`}
+          ${code && html`<div className="mt-3">
+            <p className="text-white/70 text-sm">Usado ${code.useCount} ${code.useCount === 1 ? 'vez' : 'veces'}</p>
+            <p className="text-white/50 text-xs mt-1">Comparte ahora y gana $50.000 por cada restaurante que se una</p>
+          </div>`}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 border-l-4 border-l-green-500 p-5">
+            <p className="text-sm text-gray-500">Total Ganado</p>
+            <p className="text-3xl font-bold text-green-600 mt-1">${formatCLP(totalEarned)}</p>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 border-l-4 border-l-justo-500 p-5">
             <p className="text-sm text-gray-500">Referidos Enviados</p>
             <p className="text-3xl font-bold text-gray-900 mt-1">${sent.length}</p>
           </div>
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 border-l-4 border-l-ocean-500 p-5">
             <p className="text-sm text-gray-500">Recompensas Activas</p>
-            <p className="text-3xl font-bold text-green-600 mt-1">${activeRewards}</p>
+            <p className="text-3xl font-bold text-ocean-600 mt-1">${activeRewards}</p>
           </div>
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 border-l-4 border-l-blue-500 p-5">
             <p className="text-sm text-gray-500">Recompensas Canjeadas</p>
             <p className="text-3xl font-bold text-blue-600 mt-1">${redeemedRewards}</p>
           </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-6">Tu Embudo de Referidos</h3>
+          <div className="flex items-center justify-between gap-2 sm:gap-4">
+            <div className="flex-1 text-center">
+              <div className=${'mx-auto w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center text-xl sm:text-2xl font-bold ' + (funnelSent > 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-400')}>${funnelSent}</div>
+              <p className="text-xs sm:text-sm text-gray-500 mt-2 font-medium">Enviados</p>
+            </div>
+            <div className="flex-shrink-0">
+              <div className=${'h-1 w-8 sm:w-12 rounded ' + (funnelQualified > 0 ? 'bg-gradient-to-r from-yellow-400 to-blue-400' : 'bg-gray-200')} />
+            </div>
+            <div className="flex-1 text-center">
+              <div className=${'mx-auto w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center text-xl sm:text-2xl font-bold ' + (funnelQualified > 0 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400')}>${funnelQualified}</div>
+              <p className="text-xs sm:text-sm text-gray-500 mt-2 font-medium">Calificados</p>
+            </div>
+            <div className="flex-shrink-0">
+              <div className=${'h-1 w-8 sm:w-12 rounded ' + (funnelRewarded > 0 ? 'bg-gradient-to-r from-blue-400 to-green-400' : 'bg-gray-200')} />
+            </div>
+            <div className="flex-1 text-center">
+              <div className=${'mx-auto w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center text-xl sm:text-2xl font-bold ' + (funnelRewarded > 0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400')}>${funnelRewarded}</div>
+              <p className="text-xs sm:text-sm text-gray-500 mt-2 font-medium">Recompensados</p>
+            </div>
+          </div>
+          ${funnelSent > 0 && html`<div className="flex justify-center gap-4 mt-4 text-xs text-gray-400">
+            <span>${funnelSent > 0 ? Math.round((funnelQualified / funnelSent) * 100) : 0}% calificacion</span>
+            <span>${funnelQualified > 0 ? Math.round((funnelRewarded / funnelQualified) * 100) : 0}% recompensa</span>
+          </div>`}
+        </div>
+
+        <div className="bg-gradient-to-r from-justo-50 to-ocean-50 rounded-xl border border-justo-100 p-6">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-justo-400 to-ocean-500 flex items-center justify-center text-white">
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            </div>
+            <div>
+              <p className="text-sm font-bold text-gray-900">${milestoneLevel}</p>
+              <p className="text-xs text-gray-500">${milestoneLabel}</p>
+            </div>
+          </div>
+          ${milestoneNext > 0 && html`<div className="mt-2">
+            <div className="flex justify-between text-xs text-gray-500 mb-1">
+              <span>${qualifiedCount} referidos exitosos</span>
+              <span>${milestoneNext}</span>
+            </div>
+            <div className="h-2.5 bg-white rounded-full overflow-hidden shadow-inner">
+              <div className="h-full bg-gradient-to-r from-justo-400 to-ocean-400 rounded-full transition-all duration-500" style=${{ width: milestoneProgress + '%' }} />
+            </div>
+          </div>`}
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
@@ -522,15 +593,27 @@
     }
 
     // ─── Admin Panel ─────────────────────────────────────
+    function RankBadge(props) {
+      var pos = props.position;
+      if (pos === 1) return html`<div className="w-8 h-8 rounded-full bg-yellow-400 flex items-center justify-center text-white text-sm font-bold shadow-sm">1</div>`;
+      if (pos === 2) return html`<div className="w-8 h-8 rounded-full bg-gray-400 flex items-center justify-center text-white text-sm font-bold shadow-sm">2</div>`;
+      if (pos === 3) return html`<div className="w-8 h-8 rounded-full bg-amber-600 flex items-center justify-center text-white text-sm font-bold shadow-sm">3</div>`;
+      return html`<div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 text-sm font-medium">${pos}</div>`;
+    }
+
     function AdminPanel() {
       var toast = useToast();
       var _r = useState([]), referrals = _r[0], setReferrals = _r[1];
+      var _a = useState(null), analytics = _a[0], setAnalytics = _a[1];
       var _l = useState(true), loading = _l[0], setLoading = _l[1];
       var _f = useState('ALL'), filter = _f[0], setFilter = _f[1];
       var _q = useState(null), qualifyingId = _q[0], setQualifyingId = _q[1];
 
       useEffect(function() {
-        api('/referrals/admin/all').then(setReferrals).catch(function() {}).finally(function() { setLoading(false); });
+        Promise.all([api('/referrals/admin/all'), api('/analytics/dashboard')])
+          .then(function(res) { setReferrals(res[0]); setAnalytics(res[1]); })
+          .catch(function() {})
+          .finally(function() { setLoading(false); });
       }, []);
 
       function qualify(id) {
@@ -550,47 +633,217 @@
       var filters = ['ALL', 'PENDING', 'QUALIFIED', 'REWARDED', 'EXPIRED'];
       var filterLabels = { ALL: 'Todos', PENDING: 'Pendientes', QUALIFIED: 'Calificados', REWARDED: 'Recompensados', EXPIRED: 'Expirados' };
 
+      // Reward type breakdown (client-side from referral data)
+      var creditTotal = 0, discountTotal = 0;
+      referrals.forEach(function(ref) {
+        (ref.rewards || []).forEach(function(rw) {
+          if (rw.rewardType === 'CREDITS' && rw.amount) creditTotal += rw.amount;
+          if (rw.rewardType === 'DISCOUNT' && rw.amount) discountTotal += rw.amount;
+        });
+      });
+
+      // Funnel widths
+      var fTotal = analytics ? analytics.funnel.total : 0;
+      var fQualPlus = analytics ? (analytics.funnel.qualified + analytics.funnel.rewarded) : 0;
+      var fRewarded = analytics ? analytics.funnel.rewarded : 0;
+      var widthQual = fTotal > 0 ? Math.round((fQualPlus / fTotal) * 100) : 0;
+      var widthRew = fTotal > 0 ? Math.round((fRewarded / fTotal) * 100) : 0;
+      var dropoff1 = fTotal > 0 ? Math.round(((fTotal - fQualPlus) / fTotal) * 100) : 0;
+      var dropoff2 = fQualPlus > 0 ? Math.round(((fQualPlus - fRewarded) / fQualPlus) * 100) : 0;
+
+      // Redeem progress
+      var redeemPct = analytics && analytics.rewardEconomics.totalIssuedAmount > 0
+        ? Math.round((analytics.rewardEconomics.totalRedeemedAmount / analytics.rewardEconomics.totalIssuedAmount) * 100) : 0;
+
+      // Conversion rate color
+      var convRate = analytics ? analytics.funnel.conversionRate : 0;
+      var convColor = convRate >= 50 ? 'border-l-green-500' : convRate >= 25 ? 'border-l-yellow-500' : 'border-l-red-500';
+
       return html`<div className="space-y-6">
-        <h2 className="text-2xl font-bold text-gray-900">Panel de Administracion</h2>
-        <div className="flex items-center gap-3 flex-wrap">
-          ${filters.map(function(f) {
-            return html`<button key=${f} onClick=${function() { setFilter(f); }}
-              className=${'px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ' + (filter === f ? 'bg-justo-500 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50')}>
-              ${filterLabels[f]}${f !== 'ALL' ? ' (' + referrals.filter(function(r) { return r.status === f; }).length + ')' : ''}
-            </button>`;
-          })}
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Panel de Administracion</h2>
+          <p className="text-sm text-gray-500 mt-1">Metricas y gestion del programa de referidos</p>
         </div>
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100">
-          ${filtered.length === 0
-            ? html`<${EmptyState} title="Sin referidos" description="No hay referidos con este filtro." />`
-            : html`<div className="overflow-x-auto"><table className="w-full">
-                <thead><tr className="border-b border-gray-100">
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Referente</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Restaurante</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Estado</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Fecha</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Acciones</th>
-                </tr></thead>
-                <tbody>${filtered.map(function(r) {
-                  var ref = r.referralCode && r.referralCode.referrer;
-                  var rest = r.referredRestaurant;
+
+        ${analytics && html`<${React.Fragment}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 border-l-4 border-l-justo-500 p-5">
+              <p className="text-sm text-gray-500 font-medium">Total Referidos</p>
+              <p className="text-3xl font-bold text-gray-900 mt-1">${analytics.funnel.total}</p>
+              <p className="text-xs text-gray-400 mt-2">${analytics.funnel.pending} pendientes, ${analytics.funnel.qualified} calificados</p>
+            </div>
+            <div className=${'bg-white rounded-xl shadow-sm border border-gray-100 border-l-4 p-5 ' + convColor}>
+              <p className="text-sm text-gray-500 font-medium">Tasa de Conversion</p>
+              <p className="text-3xl font-bold text-gray-900 mt-1">${analytics.funnel.conversionRate}%</p>
+              <p className="text-xs text-gray-400 mt-2">Calificados + Recompensados / Total</p>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 border-l-4 border-l-ocean-500 p-5">
+              <p className="text-sm text-gray-500 font-medium">Recompensas Emitidas</p>
+              <p className="text-3xl font-bold text-gray-900 mt-1">${formatCLP(analytics.rewardEconomics.totalIssuedAmount)}</p>
+              <p className="text-xs text-gray-400 mt-2">${analytics.rewardEconomics.issuedCount} recompensas</p>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 border-l-4 border-l-blue-500 p-5">
+              <p className="text-sm text-gray-500 font-medium">Tasa de Canje</p>
+              <p className="text-3xl font-bold text-gray-900 mt-1">${analytics.rewardEconomics.redemptionRate}%</p>
+              <p className="text-xs text-gray-400 mt-2">${analytics.rewardEconomics.redeemedCount} de ${analytics.rewardEconomics.issuedCount} canjeadas</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-6">Embudo de Conversion</h3>
+              <div className="space-y-1">
+                <div className="flex items-center gap-3">
+                  <div className="w-24 text-right"><span className="text-xs font-medium text-gray-500">Pendientes</span></div>
+                  <div className="flex-1"><div className="relative h-10 rounded-lg overflow-hidden bg-gray-100">
+                    <div className="h-full rounded-lg bg-yellow-400" style=${{ width: '100%' }} />
+                    <div className="absolute inset-0 flex items-center justify-center"><span className="text-sm font-bold text-gray-700">${analytics.funnel.pending + analytics.funnel.qualified + analytics.funnel.rewarded}</span></div>
+                  </div></div>
+                  <div className="w-12 text-right"><span className="text-xs text-gray-400">100%</span></div>
+                </div>
+                <div className="flex items-center gap-3 ml-24 pl-3">
+                  <svg className="h-4 w-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
+                  <span className="text-xs text-red-400">${dropoff1 > 0 ? '-' + dropoff1 + '% abandono' : 'Sin abandono'}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-24 text-right"><span className="text-xs font-medium text-gray-500">Calificados</span></div>
+                  <div className="flex-1"><div className="relative h-10 rounded-lg overflow-hidden bg-gray-100">
+                    <div className="h-full rounded-lg bg-blue-400 transition-all duration-500" style=${{ width: widthQual + '%' }} />
+                    <div className="absolute inset-0 flex items-center justify-center"><span className="text-sm font-bold text-gray-700">${fQualPlus}</span></div>
+                  </div></div>
+                  <div className="w-12 text-right"><span className="text-xs text-gray-400">${widthQual}%</span></div>
+                </div>
+                <div className="flex items-center gap-3 ml-24 pl-3">
+                  <svg className="h-4 w-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
+                  <span className="text-xs text-red-400">${dropoff2 > 0 ? '-' + dropoff2 + '% pendiente' : 'Todos recompensados'}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-24 text-right"><span className="text-xs font-medium text-gray-500">Recompensados</span></div>
+                  <div className="flex-1"><div className="relative h-10 rounded-lg overflow-hidden bg-gray-100">
+                    <div className="h-full rounded-lg bg-green-400 transition-all duration-500" style=${{ width: widthRew + '%' }} />
+                    <div className="absolute inset-0 flex items-center justify-center"><span className="text-sm font-bold text-gray-700">${fRewarded}</span></div>
+                  </div></div>
+                  <div className="w-12 text-right"><span className="text-xs text-gray-400">${widthRew}%</span></div>
+                </div>
+              </div>
+              <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="h-6 rounded bg-gray-300 flex items-center justify-center px-3"><span className="text-xs font-medium text-gray-600">${analytics.funnel.expired}</span></div>
+                  <span className="text-xs text-gray-400">Expirados</span>
+                </div>
+                <span className="text-xs text-gray-400">Tiempo promedio de calificacion: ${analytics.avgTimeToQualifyDays} dias</span>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-6">Economia de Recompensas</h3>
+              <div className="space-y-4">
+                <div>
+                  <div className="flex justify-between text-sm mb-2">
+                    <span className="text-gray-500">Total Emitido</span>
+                    <span className="font-bold text-gray-900">${formatCLP(analytics.rewardEconomics.totalIssuedAmount)}</span>
+                  </div>
+                  <div className="h-4 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-justo-400 to-ocean-400 rounded-full" style=${{ width: '100%' }} />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex justify-between text-sm mb-2">
+                    <span className="text-gray-500">Total Canjeado</span>
+                    <span className="font-bold text-green-600">${formatCLP(analytics.rewardEconomics.totalRedeemedAmount)}</span>
+                  </div>
+                  <div className="h-4 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-green-400 rounded-full transition-all duration-500" style=${{ width: redeemPct + '%' }} />
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">${redeemPct}% del total emitido</p>
+                </div>
+              </div>
+              <div className="flex gap-3 mt-6">
+                <div className="flex-1 bg-justo-50 rounded-lg p-3 text-center">
+                  <p className="text-xs text-justo-600 font-medium">Creditos</p>
+                  <p className="text-sm font-bold text-justo-700">${formatCLP(creditTotal)}</p>
+                </div>
+                <div className="flex-1 bg-ocean-50 rounded-lg p-3 text-center">
+                  <p className="text-xs text-ocean-600 font-medium">Descuentos</p>
+                  <p className="text-sm font-bold text-ocean-700">${formatCLP(discountTotal)}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          ${analytics.topReferrers.length > 0 && html`<div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Top Referidores</h3>
+            <div className="overflow-x-auto"><table className="w-full">
+              <thead><tr className="border-b border-gray-100">
+                <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase w-12">#</th>
+                <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase">Nombre</th>
+                <th className="text-center px-3 py-2 text-xs font-medium text-gray-500 uppercase">Enviados</th>
+                <th className="text-center px-3 py-2 text-xs font-medium text-gray-500 uppercase">Calificados</th>
+                <th className="text-center px-3 py-2 text-xs font-medium text-gray-500 uppercase">Conversion</th>
+                <th className="text-right px-3 py-2 text-xs font-medium text-gray-500 uppercase">Ganado</th>
+              </tr></thead>
+              <tbody>
+                ${analytics.topReferrers.map(function(r, i) {
+                  var convR = r.totalReferrals > 0 ? Math.round((r.qualifiedCount / r.totalReferrals) * 100) : 0;
                   return html`<tr key=${r.id} className="border-b border-gray-50 last:border-0">
-                    <td className="px-6 py-4">
-                      <p className="text-sm font-medium text-gray-900">${ref && ref.name}</p>
-                      <p className="text-xs text-gray-500">${ref && ref.email}</p>
+                    <td className="px-3 py-3"><${RankBadge} position=${i + 1} /></td>
+                    <td className="px-3 py-3">
+                      <p className="text-sm font-medium text-gray-900">${r.name}</p>
+                      <p className="text-xs text-gray-400">${r.email}</p>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">${rest && rest.name}</td>
-                    <td className="px-6 py-4"><${StatusBadge} status=${r.status} /></td>
-                    <td className="px-6 py-4 text-sm text-gray-500">${new Date(r.createdAt).toLocaleDateString('es-CL')}</td>
-                    <td className="px-6 py-4">
-                      ${r.status === 'PENDING' && html`<button onClick=${function() { qualify(r.id); }} disabled=${qualifyingId === r.id}
-                        className="bg-ocean-500 hover:bg-ocean-600 disabled:opacity-50 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
-                        ${qualifyingId === r.id ? html`<${Spinner} className="h-3 w-3" />` : 'Calificar'}
-                      </button>`}
-                    </td>
+                    <td className="px-3 py-3 text-center text-sm font-medium text-gray-700">${r.totalReferrals}</td>
+                    <td className="px-3 py-3 text-center text-sm font-bold text-green-600">${r.qualifiedCount}</td>
+                    <td className="px-3 py-3 text-center text-sm text-gray-600">${convR}%</td>
+                    <td className="px-3 py-3 text-right text-sm font-bold text-justo-600">${formatCLP(r.totalEarned)}</td>
                   </tr>`;
-                })}</tbody>
-              </table></div>`}
+                })}
+              </tbody>
+            </table></div>
+          </div>`}
+        </${React.Fragment}>`}
+
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Gestion de Referidos</h3>
+          <div className="flex items-center gap-3 flex-wrap mb-4">
+            ${filters.map(function(f) {
+              return html`<button key=${f} onClick=${function() { setFilter(f); }}
+                className=${'px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ' + (filter === f ? 'bg-justo-500 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50')}>
+                ${filterLabels[f]}${f !== 'ALL' ? ' (' + referrals.filter(function(r) { return r.status === f; }).length + ')' : ''}
+              </button>`;
+            })}
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+            ${filtered.length === 0
+              ? html`<${EmptyState} title="Sin referidos" description="No hay referidos con este filtro." />`
+              : html`<div className="overflow-x-auto"><table className="w-full">
+                  <thead><tr className="border-b border-gray-100">
+                    <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Referente</th>
+                    <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Restaurante</th>
+                    <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Estado</th>
+                    <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                    <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                  </tr></thead>
+                  <tbody>${filtered.map(function(r) {
+                    var ref = r.referralCode && r.referralCode.referrer;
+                    var rest = r.referredRestaurant;
+                    return html`<tr key=${r.id} className="border-b border-gray-50 last:border-0">
+                      <td className="px-6 py-4">
+                        <p className="text-sm font-medium text-gray-900">${ref && ref.name}</p>
+                        <p className="text-xs text-gray-500">${ref && ref.email}</p>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-900">${rest && rest.name}</td>
+                      <td className="px-6 py-4"><${StatusBadge} status=${r.status} /></td>
+                      <td className="px-6 py-4 text-sm text-gray-500">${new Date(r.createdAt).toLocaleDateString('es-CL')}</td>
+                      <td className="px-6 py-4">
+                        ${r.status === 'PENDING' && html`<button onClick=${function() { qualify(r.id); }} disabled=${qualifyingId === r.id}
+                          className="bg-ocean-500 hover:bg-ocean-600 disabled:opacity-50 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
+                          ${qualifyingId === r.id ? html`<${Spinner} className="h-3 w-3" />` : 'Calificar'}
+                        </button>`}
+                      </td>
+                    </tr>`;
+                  })}</tbody>
+                </table></div>`}
+          </div>
         </div>
       </div>`;
     }
