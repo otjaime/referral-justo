@@ -83,6 +83,12 @@ async function main() {
     create: { code: 'JUSTO-CAROL1', referrerUserId: carol.id, useCount: 1 },
   });
 
+  const adminCode = await prisma.referralCode.upsert({
+    where: { code: 'JUSTO-ADMIN1' },
+    update: { useCount: 1 },
+    create: { code: 'JUSTO-ADMIN1', referrerUserId: admin.id, useCount: 1 },
+  });
+
   console.log('Referral codes created');
 
   // ── Helper: create restaurant + referral if not exists ──
@@ -166,6 +172,12 @@ async function main() {
   }
   console.log('Carol referrals created: 1');
 
+  // ── Restaurant referred by Admin (Alice) ─────────
+  // Alice's restaurant - REWARDED (admin invited Alice originally)
+  const aliceRest = await createReferredRestaurant('La Cocina de Alice', alice.id, adminCode.id, ReferralStatus.REWARDED, 60);
+
+  console.log('Admin referrals created: 1');
+
   // ── Rewards ────────────────────────────────────────
   // Helper
   async function createReward(
@@ -212,8 +224,8 @@ async function main() {
   // From Carol's restaurant via Bob... Alice doesn't get this one
 
   // Bob's rewards ──
-  // As REFERRED (from Alice's code) - issued
-  await createReward(bobRest.id, bob.id, 'REFERRED', 'DISCOUNT', 100000, '$100.000 CLP de descuento en tu segundo mes', RewardStatus.ISSUED, 60);
+  // As REFERRED (from Alice's code) - redeemed
+  await createReward(bobRest.id, bob.id, 'REFERRED', 'DISCOUNT', 100000, '$100.000 CLP de descuento en tu segundo mes', RewardStatus.REDEEMED, 60);
 
   // As REFERRER (Carol's restaurant) - issued
   await createReward(carolRest.id, bob.id, 'REFERRER', 'CREDITS', 50000, '$50.000 CLP en creditos por referir Birria Don Caro', RewardStatus.ISSUED, 60);
@@ -222,8 +234,8 @@ async function main() {
   await createReward(davidRest.id, david.id, 'REFERRED', 'DISCOUNT', 100000, '$100.000 CLP de descuento en tu segundo mes', RewardStatus.REDEEMED, 5);
 
   // Carol's rewards ──
-  // As REFERRED (from Bob) - issued
-  await createReward(carolRest.id, carol.id, 'REFERRED', 'DISCOUNT', 100000, '$100.000 CLP de descuento en tu segundo mes', RewardStatus.ISSUED, 45);
+  // As REFERRED (from Bob) - redeemed
+  await createReward(carolRest.id, carol.id, 'REFERRED', 'DISCOUNT', 100000, '$100.000 CLP de descuento en tu segundo mes', RewardStatus.REDEEMED, 45);
 
   // As REFERRER (Hugo's restaurant) - issued
   await createReward(hugoRest2.id, carol.id, 'REFERRER', 'CREDITS', 50000, '$50.000 CLP en creditos por referir Antojitos Hugo', RewardStatus.ISSUED, 60);
@@ -231,19 +243,25 @@ async function main() {
   // Hugo's reward as REFERRED (from Carol) - issued
   await createReward(hugoRest2.id, hugo.id, 'REFERRED', 'DISCOUNT', 100000, '$100.000 CLP de descuento en tu segundo mes', RewardStatus.ISSUED, 60);
 
+  // Admin's reward as REFERRER (Alice's restaurant) - issued
+  await createReward(aliceRest.id, admin.id, 'REFERRER', 'CREDITS', 50000, '$50.000 CLP en creditos por referir La Cocina de Alice', RewardStatus.ISSUED, 30);
+
+  // Alice's reward as REFERRED (from Admin) - issued
+  await createReward(aliceRest.id, alice.id, 'REFERRED', 'DISCOUNT', 100000, '$100.000 CLP de descuento en tu segundo mes', RewardStatus.ISSUED, 60);
+
   console.log('Rewards created');
 
   console.log('\n=== Seed Summary ===');
   console.log('Users: 9 (1 admin + 8 users)');
-  console.log('Referral codes: 3 (Alice, Bob, Carol)');
-  console.log('Restaurants: 8');
-  console.log('Referrals: 8 (2 REWARDED, 2 QUALIFIED, 3 PENDING, 1 EXPIRED)');
-  console.log('Rewards: 8');
+  console.log('Referral codes: 4 (Admin, Alice, Bob, Carol)');
+  console.log('Restaurants: 9');
+  console.log('Referrals: 9 (3 REWARDED, 2 QUALIFIED, 3 PENDING, 1 EXPIRED)');
+  console.log('Rewards: 10');
   console.log('\nLogin credentials:');
-  console.log('  Admin:  admin@justo.mx / admin123');
-  console.log('  Alice:  alice@example.com / password123 (5 referrals, top referrer)');
-  console.log('  Bob:    bob@example.com / password123 (referred + referrer)');
-  console.log('  Carol:  carol@example.com / password123 (referred + referrer)');
+  console.log('  Admin:  admin@justo.mx / admin123 (1 referral, admin panel)');
+  console.log('  Alice:  alice@example.com / password123 (5 sent, referred by admin, 3 rewards)');
+  console.log('  Bob:    bob@example.com / password123 (2 sent, referred by Alice, 2 rewards)');
+  console.log('  Carol:  carol@example.com / password123 (1 sent, referred by Bob, 2 rewards)');
 }
 
 main()
