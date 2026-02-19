@@ -590,14 +590,15 @@
       </div>`;
     }
 
-    // ─── Invite Page (Public Onboarding) ──────────────
+    // ─── Invite Page (Restaurant Onboarding) ──────────────
     function InvitePage(props) {
       var auth = useAuth();
       var toast = useToast();
       var code = props.code;
       var _rs = useState('loading'), refStatus = _rs[0], setRefStatus = _rs[1];
       var _rn = useState(''), referrerName = _rn[0], setReferrerName = _rn[1];
-      var _f = useState({ name: '', email: '', password: '', restaurantName: '' }), form = _f[0], setForm = _f[1];
+      var _step = useState(0), step = _step[0], setStep = _step[1];
+      var _f = useState({ restaurantName: '', name: '', email: '', password: '' }), form = _f[0], setForm = _f[1];
       var _ld = useState(false), loading = _ld[0], setLoading = _ld[1];
       var _e = useState(''), error = _e[0], setError = _e[1];
 
@@ -623,7 +624,7 @@
         })
           .then(function(data) {
             auth.login(data.user, data.token);
-            toast.addToast('Bienvenido a Justo! Tu restaurante ha sido registrado.');
+            toast.addToast('Tu restaurante ha sido registrado en Justo!');
             navigate('/');
           })
           .catch(function(err) { setError(err.message); })
@@ -643,50 +644,129 @@
         </div>
       </div>`;
 
-      return html`<div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-justo-600 to-ocean-600 p-4">
-        <div className="w-full max-w-md">
+      // Step indicators
+      var stepLabels = ['Bienvenida', 'Tu Restaurante', 'Tu Cuenta'];
+
+      var stepBar = html`<div className="flex items-center justify-center gap-2 mb-6">
+        ${stepLabels.map(function(label, i) {
+          var active = i === step;
+          var done = i < step;
+          return html`<div key=${i} className="flex items-center">
+            ${i > 0 && html`<div className=${'w-8 h-0.5 mx-1 ' + (done ? 'bg-justo-500' : 'bg-gray-200')} />`}
+            <div className="flex flex-col items-center">
+              <div className=${'w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors ' + (active ? 'bg-justo-500 text-white' : done ? 'bg-justo-500 text-white' : 'bg-gray-200 text-gray-500')}>
+                ${done ? html`<svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"/></svg>` : (i + 1)}
+              </div>
+              <span className=${'text-xs mt-1 ' + (active ? 'text-justo-600 font-medium' : 'text-gray-400')}>${label}</span>
+            </div>
+          </div>`;
+        })}
+      </div>`;
+
+      // Step 0: Welcome
+      if (step === 0) return html`<div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-justo-600 to-ocean-600 p-4">
+        <div className="w-full max-w-lg">
           <div className="text-center mb-6">
             <h1 className="text-4xl font-bold text-white">Justo</h1>
-            <p className="text-white/80 mt-2">Programa de Referidos</p>
           </div>
           <div className="bg-white rounded-2xl shadow-xl p-8">
+            ${stepBar}
             <div className="text-center mb-6">
-              <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-justo-100 text-justo-600 mb-3">
-                <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z"/></svg>
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-justo-100 text-justo-600 mb-4">
+                <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
               </div>
-              <p className="text-sm text-gray-500">Fuiste invitado por</p>
-              <p className="text-xl font-bold text-gray-900">${referrerName}</p>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Lleva tu restaurante al siguiente nivel</h2>
+              <p className="text-gray-500">${referrerName} te invita a unirte a la plataforma de Justo</p>
             </div>
-            <div className="border-t border-gray-100 pt-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Crea tu cuenta y registra tu restaurante</h3>
-              <form onSubmit=${handleSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Tu Nombre</label>
-                  <input type="text" required value=${form.name} onInput=${function(e) { setForm(Object.assign({}, form, { name: e.target.value })); }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-justo-500 focus:border-transparent outline-none" placeholder="Tu nombre completo" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                  <input type="email" required value=${form.email} onInput=${function(e) { setForm(Object.assign({}, form, { email: e.target.value })); }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-justo-500 focus:border-transparent outline-none" placeholder="tu@email.com" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Contrasena</label>
-                  <input type="password" required minLength=${6} value=${form.password} onInput=${function(e) { setForm(Object.assign({}, form, { password: e.target.value })); }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-justo-500 focus:border-transparent outline-none" placeholder="Min. 6 caracteres" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del Restaurante</label>
-                  <input type="text" required value=${form.restaurantName} onInput=${function(e) { setForm(Object.assign({}, form, { restaurantName: e.target.value })); }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-justo-500 focus:border-transparent outline-none" placeholder="Ej: Tacos El Rey" />
-                </div>
-                ${error && html`<p className="text-red-500 text-sm">${error}</p>`}
-                <button type="submit" disabled=${loading} className="w-full bg-justo-500 hover:bg-justo-600 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center">
-                  ${loading ? html`<${Spinner} className="h-5 w-5" />` : 'Unirme a Justo'}
+            <div className="space-y-3 mb-6">
+              <div className="flex items-start gap-3 p-3 bg-justo-50 rounded-lg">
+                <div className="text-justo-500 mt-0.5"><svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg></div>
+                <div><p className="text-sm font-medium text-gray-900">Mayor visibilidad</p><p className="text-xs text-gray-500">Llega a mas clientes a traves de la plataforma</p></div>
+              </div>
+              <div className="flex items-start gap-3 p-3 bg-justo-50 rounded-lg">
+                <div className="text-justo-500 mt-0.5"><svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg></div>
+                <div><p className="text-sm font-medium text-gray-900">Beneficios por referido</p><p className="text-xs text-gray-500">Obtiene recompensas al registrarte con esta invitacion</p></div>
+              </div>
+              <div className="flex items-start gap-3 p-3 bg-justo-50 rounded-lg">
+                <div className="text-justo-500 mt-0.5"><svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg></div>
+                <div><p className="text-sm font-medium text-gray-900">Facil y rapido</p><p className="text-xs text-gray-500">Registra tu restaurante en menos de 2 minutos</p></div>
+              </div>
+            </div>
+            <button onClick=${function() { setStep(1); }} className="w-full bg-justo-500 hover:bg-justo-600 text-white font-medium py-3 rounded-lg transition-colors text-lg">Comenzar</button>
+            <p className="text-center text-sm text-gray-500 mt-4">Ya tienes cuenta? <a href="#/login" className="text-justo-600 font-medium hover:underline">Iniciar Sesion</a></p>
+          </div>
+        </div>
+      </div>`;
+
+      // Step 1: Restaurant info
+      if (step === 1) return html`<div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-justo-600 to-ocean-600 p-4">
+        <div className="w-full max-w-lg">
+          <div className="text-center mb-6">
+            <h1 className="text-4xl font-bold text-white">Justo</h1>
+          </div>
+          <div className="bg-white rounded-2xl shadow-xl p-8">
+            ${stepBar}
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-ocean-100 text-ocean-600 mb-3">
+                <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+              </div>
+              <h2 className="text-xl font-bold text-gray-900">Datos de tu restaurante</h2>
+              <p className="text-sm text-gray-500 mt-1">Cuentanos sobre tu negocio</p>
+            </div>
+            <form onSubmit=${function(e) { e.preventDefault(); if (form.restaurantName.trim()) setStep(2); }} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del Restaurante</label>
+                <input type="text" required value=${form.restaurantName} onInput=${function(e) { setForm(Object.assign({}, form, { restaurantName: e.target.value })); }}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-justo-500 focus:border-transparent outline-none text-lg" placeholder="Ej: Tacos El Rey" autofocus />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick=${function() { setStep(0); }} className="flex-1 border border-gray-300 text-gray-700 font-medium py-2.5 rounded-lg transition-colors hover:bg-gray-50">Atras</button>
+                <button type="submit" className="flex-1 bg-justo-500 hover:bg-justo-600 text-white font-medium py-2.5 rounded-lg transition-colors">Continuar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>`;
+
+      // Step 2: Account creation
+      return html`<div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-justo-600 to-ocean-600 p-4">
+        <div className="w-full max-w-lg">
+          <div className="text-center mb-6">
+            <h1 className="text-4xl font-bold text-white">Justo</h1>
+          </div>
+          <div className="bg-white rounded-2xl shadow-xl p-8">
+            ${stepBar}
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-green-100 text-green-600 mb-3">
+                <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+              </div>
+              <h2 className="text-xl font-bold text-gray-900">Crea tu cuenta</h2>
+              <p className="text-sm text-gray-500 mt-1">Ultimo paso para registrar <span className="font-medium text-gray-700">${form.restaurantName}</span></p>
+            </div>
+            <form onSubmit=${handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tu Nombre</label>
+                <input type="text" required value=${form.name} onInput=${function(e) { setForm(Object.assign({}, form, { name: e.target.value })); }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-justo-500 focus:border-transparent outline-none" placeholder="Tu nombre completo" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input type="email" required value=${form.email} onInput=${function(e) { setForm(Object.assign({}, form, { email: e.target.value })); }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-justo-500 focus:border-transparent outline-none" placeholder="tu@email.com" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Contrasena</label>
+                <input type="password" required minLength=${6} value=${form.password} onInput=${function(e) { setForm(Object.assign({}, form, { password: e.target.value })); }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-justo-500 focus:border-transparent outline-none" placeholder="Min. 6 caracteres" />
+              </div>
+              ${error && html`<p className="text-red-500 text-sm">${error}</p>`}
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick=${function() { setStep(1); }} className="flex-1 border border-gray-300 text-gray-700 font-medium py-2.5 rounded-lg transition-colors hover:bg-gray-50">Atras</button>
+                <button type="submit" disabled=${loading} className="flex-1 bg-justo-500 hover:bg-justo-600 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center">
+                  ${loading ? html`<${Spinner} className="h-5 w-5" />` : 'Registrar Restaurante'}
                 </button>
-              </form>
-              <p className="text-center text-sm text-gray-500 mt-4">Ya tienes cuenta? <a href="#/login" className="text-justo-600 font-medium hover:underline">Iniciar Sesion</a></p>
-            </div>
+              </div>
+            </form>
           </div>
         </div>
       </div>`;
