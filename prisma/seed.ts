@@ -204,32 +204,32 @@ async function main() {
 
   // Alice's rewards (as REFERRER) ──
   // From David's restaurant (REWARDED) - redeemed
-  await createReward(davidRest.id, alice.id, 'REFERRER', 'CREDITS', 500, '$500 MXN en creditos por referir Sushi Tokio Express', RewardStatus.REDEEMED, 30);
+  await createReward(davidRest.id, alice.id, 'REFERRER', 'CREDITS', 50000, '$50.000 CLP en creditos por referir Sushi Tokio Express', RewardStatus.REDEEMED, 30);
 
   // From Bob's restaurant (QUALIFIED) - issued, available
-  await createReward(bobRest.id, alice.id, 'REFERRER', 'CREDITS', 500, '$500 MXN en creditos por referir Tacos El Patron', RewardStatus.ISSUED, 60);
+  await createReward(bobRest.id, alice.id, 'REFERRER', 'CREDITS', 50000, '$50.000 CLP en creditos por referir Tacos El Patron', RewardStatus.ISSUED, 60);
 
   // From Carol's restaurant via Bob... Alice doesn't get this one
 
   // Bob's rewards ──
   // As REFERRED (from Alice's code) - issued
-  await createReward(bobRest.id, bob.id, 'REFERRED', 'FEE_WAIVER', null, '30 dias sin comision por unirte via referido', RewardStatus.ISSUED, 30);
+  await createReward(bobRest.id, bob.id, 'REFERRED', 'DISCOUNT', 100000, '$100.000 CLP de descuento en tu segundo mes', RewardStatus.ISSUED, 60);
 
   // As REFERRER (Carol's restaurant) - issued
-  await createReward(carolRest.id, bob.id, 'REFERRER', 'CREDITS', 500, '$500 MXN en creditos por referir Birria Don Caro', RewardStatus.ISSUED, 60);
+  await createReward(carolRest.id, bob.id, 'REFERRER', 'CREDITS', 50000, '$50.000 CLP en creditos por referir Birria Don Caro', RewardStatus.ISSUED, 60);
 
   // David's reward as REFERRED - redeemed
-  await createReward(davidRest.id, david.id, 'REFERRED', 'FEE_WAIVER', null, '30 dias sin comision por unirte via referido', RewardStatus.REDEEMED, 5);
+  await createReward(davidRest.id, david.id, 'REFERRED', 'DISCOUNT', 100000, '$100.000 CLP de descuento en tu segundo mes', RewardStatus.REDEEMED, 5);
 
   // Carol's rewards ──
   // As REFERRED (from Bob) - issued
-  await createReward(carolRest.id, carol.id, 'REFERRED', 'FEE_WAIVER', null, '30 dias sin comision por unirte via referido', RewardStatus.ISSUED, 45);
+  await createReward(carolRest.id, carol.id, 'REFERRED', 'DISCOUNT', 100000, '$100.000 CLP de descuento en tu segundo mes', RewardStatus.ISSUED, 45);
 
   // As REFERRER (Hugo's restaurant) - issued
-  await createReward(hugoRest2.id, carol.id, 'REFERRER', 'CREDITS', 500, '$500 MXN en creditos por referir Antojitos Hugo', RewardStatus.ISSUED, 60);
+  await createReward(hugoRest2.id, carol.id, 'REFERRER', 'CREDITS', 50000, '$50.000 CLP en creditos por referir Antojitos Hugo', RewardStatus.ISSUED, 60);
 
   // Hugo's reward as REFERRED (from Carol) - issued
-  await createReward(hugoRest2.id, hugo.id, 'REFERRED', 'DISCOUNT', 200, '20% descuento en comisiones por 30 dias', RewardStatus.ISSUED, 30);
+  await createReward(hugoRest2.id, hugo.id, 'REFERRED', 'DISCOUNT', 100000, '$100.000 CLP de descuento en tu segundo mes', RewardStatus.ISSUED, 60);
 
   console.log('Rewards created');
 

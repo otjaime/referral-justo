@@ -63,6 +63,11 @@
     }
     function navigate(path) { window.location.hash = path; }
 
+    // ─── CLP Formatter ─────────────────────────────────
+    function formatCLP(amount) {
+      return '$' + Number(amount).toLocaleString('es-CL');
+    }
+
     // ─── API Helper ──────────────────────────────────────
     function api(path, options) {
       options = options || {};
@@ -335,7 +340,7 @@
                   return html`<div key=${r.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
                     <div>
                       <p className="text-sm font-medium text-gray-900">${r.referredRestaurant.name}</p>
-                      <p className="text-xs text-gray-500">${new Date(r.createdAt).toLocaleDateString('es-MX')}</p>
+                      <p className="text-xs text-gray-500">${new Date(r.createdAt).toLocaleDateString('es-CL')}</p>
                     </div>
                     <${StatusBadge} status=${r.status} />
                   </div>`;
@@ -381,7 +386,7 @@
                   return html`<tr key=${r.id} className="border-b border-gray-50 last:border-0">
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">${r.referredRestaurant.name}</td>
                     <td className="px-6 py-4"><${StatusBadge} status=${r.status} /></td>
-                    <td className="px-6 py-4 text-sm text-gray-500">${new Date(r.createdAt).toLocaleDateString('es-MX')}</td>
+                    <td className="px-6 py-4 text-sm text-gray-500">${new Date(r.createdAt).toLocaleDateString('es-CL')}</td>
                   </tr>`;
                 })}</tbody>
               </table></div>`}
@@ -487,7 +492,7 @@
 
       function rewardTitle(r) {
         if (r.beneficiaryType === 'REFERRER') return r.rewardType === 'CREDITS' ? 'Creditos por Referido' : 'Recompensa por Referido';
-        return r.rewardType === 'FEE_WAIVER' ? 'Dias sin Comision' : 'Recompensa de Bienvenida';
+        return r.rewardType === 'DISCOUNT' ? 'Descuento Segundo Mes' : r.rewardType === 'FEE_WAIVER' ? 'Dias sin Comision' : 'Recompensa de Bienvenida';
       }
 
       return html`<div className="space-y-6">
@@ -501,10 +506,10 @@
                     <h3 className="font-semibold text-gray-900">${rewardTitle(r)}</h3>
                     <${StatusBadge} status=${r.status} />
                   </div>
-                  ${r.amount && html`<p className="text-2xl font-bold text-justo-600">$${r.amount}</p>`}
+                  ${r.amount && html`<p className="text-2xl font-bold text-justo-600">${formatCLP(r.amount)}</p>`}
                   ${r.description && html`<p className="text-sm text-gray-600 mt-1">${r.description}</p>`}
                   <div className="flex items-center justify-between mt-3">
-                    <p className="text-xs text-gray-400">${r.expiresAt ? 'Vence: ' + new Date(r.expiresAt).toLocaleDateString('es-MX') : ''}</p>
+                    <p className="text-xs text-gray-400">${r.expiresAt ? 'Vence: ' + new Date(r.expiresAt).toLocaleDateString('es-CL') : ''}</p>
                     ${r.status === 'ISSUED' && html`<button onClick=${function() { redeem(r.id); }} disabled=${redeemingId === r.id}
                       className="bg-justo-500 hover:bg-justo-600 disabled:opacity-50 text-white text-sm font-medium px-4 py-1.5 rounded-lg transition-colors">
                       ${redeemingId === r.id ? html`<${Spinner} className="h-4 w-4" />` : 'Canjear'}
@@ -576,7 +581,7 @@
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">${rest && rest.name}</td>
                     <td className="px-6 py-4"><${StatusBadge} status=${r.status} /></td>
-                    <td className="px-6 py-4 text-sm text-gray-500">${new Date(r.createdAt).toLocaleDateString('es-MX')}</td>
+                    <td className="px-6 py-4 text-sm text-gray-500">${new Date(r.createdAt).toLocaleDateString('es-CL')}</td>
                     <td className="px-6 py-4">
                       ${r.status === 'PENDING' && html`<button onClick=${function() { qualify(r.id); }} disabled=${qualifyingId === r.id}
                         className="bg-ocean-500 hover:bg-ocean-600 disabled:opacity-50 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
@@ -709,8 +714,8 @@
                 </div>
                 <div className="bg-gray-50 rounded-xl p-4 text-center">
                   <div className="text-green-500 mb-2 flex justify-center"><svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
-                  <p className="text-sm font-semibold text-gray-900">0% comision</p>
-                  <p className="text-xs text-gray-500 mt-0.5">Tu primer mes sin costo</p>
+                  <p className="text-sm font-semibold text-gray-900">Descuento 2do mes</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Ahorra en tu segundo mes</p>
                 </div>
               </div>
 

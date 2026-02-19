@@ -8,9 +8,11 @@ jest.mock('../../src/config', () => ({
     REFERRAL_CODE_PREFIX: 'JUSTO',
     REFERRAL_CODE_LENGTH: 8,
     REFERRAL_REWARD_REFERRER_TYPE: 'CREDITS',
-    REFERRAL_REWARD_REFERRER_AMOUNT: 500,
-    REFERRAL_REWARD_REFERRED_TYPE: 'FEE_WAIVER',
-    REFERRAL_REWARD_REFERRED_DESCRIPTION: '30 días sin comisión',
+    REFERRAL_REWARD_REFERRER_AMOUNT: 50000,
+    REFERRAL_REWARD_REFERRER_DESCRIPTION: '$50.000 CLP en créditos Justo',
+    REFERRAL_REWARD_REFERRED_TYPE: 'DISCOUNT',
+    REFERRAL_REWARD_REFERRED_AMOUNT: 100000,
+    REFERRAL_REWARD_REFERRED_DESCRIPTION: '$100.000 CLP de descuento en tu segundo mes',
     REFERRAL_REWARD_EXPIRES_DAYS: 90,
     REDIS_URL: 'redis://localhost:6379',
     JWT_SECRET: 'test-secret',
@@ -93,15 +95,17 @@ describe('RewardService.emitRewards', () => {
     expect(referrerReward).toBeDefined();
     expect(referrerReward!.beneficiaryId).toBe(referrer.id);
     expect(referrerReward!.rewardType).toBe('CREDITS');
-    expect(referrerReward!.amount).toBe(500);
+    expect(referrerReward!.amount).toBe(50000);
+    expect(referrerReward!.description).toBe('$50.000 CLP en créditos Justo');
     expect(referrerReward!.status).toBe('ISSUED');
     expect(referrerReward!.expiresAt).toBeDefined();
 
     const referredReward = rewards.find((r) => r.beneficiaryType === 'REFERRED');
     expect(referredReward).toBeDefined();
     expect(referredReward!.beneficiaryId).toBe(referred.id);
-    expect(referredReward!.rewardType).toBe('FEE_WAIVER');
-    expect(referredReward!.description).toBe('30 días sin comisión');
+    expect(referredReward!.rewardType).toBe('DISCOUNT');
+    expect(referredReward!.amount).toBe(100000);
+    expect(referredReward!.description).toBe('$100.000 CLP de descuento en tu segundo mes');
     expect(referredReward!.status).toBe('ISSUED');
 
     // Referral should be REWARDED

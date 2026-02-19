@@ -75,8 +75,10 @@ export class ReferralService {
       referredBenefit: {
         headline: config.REFERRAL_REWARD_REFERRED_DESCRIPTION,
         type: config.REFERRAL_REWARD_REFERRED_TYPE.toUpperCase(),
+        amount: config.REFERRAL_REWARD_REFERRED_AMOUNT,
       },
       referrerBenefit: {
+        headline: config.REFERRAL_REWARD_REFERRER_DESCRIPTION,
         type: config.REFERRAL_REWARD_REFERRER_TYPE.toUpperCase(),
         amount: config.REFERRAL_REWARD_REFERRER_AMOUNT,
       },
