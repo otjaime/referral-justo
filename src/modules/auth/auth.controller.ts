@@ -1,0 +1,17 @@
+import { Request, Response } from 'express';
+import { AuthService } from './auth.service';
+import { RegisterInput, LoginInput } from './auth.schema';
+
+const authService = new AuthService();
+
+export class AuthController {
+  async register(req: Request, res: Response) {
+    const result = await authService.register(req.body as RegisterInput);
+    res.status(201).json(result);
+  }
+
+  async login(req: Request, res: Response) {
+    const result = await authService.login(req.body as LoginInput);
+    res.json(result);
+  }
+}
