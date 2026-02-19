@@ -28,4 +28,9 @@ export class ReferralController {
     const referral = await referralService.getReceivedReferral(req.user!.userId);
     res.json(referral);
   }
+
+  async getAll(_req: Request, res: Response) {
+    const referrals = await referralService.getAllReferrals();
+    res.json(referrals);
+  }
 }

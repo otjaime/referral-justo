@@ -184,4 +184,24 @@ export class ReferralService {
       data: { status: ReferralStatus.EXPIRED },
     });
   }
+
+  async getAllReferrals() {
+    return prisma.referral.findMany({
+      include: {
+        referralCode: {
+          include: { referrer: { select: { id: true, name: true, email: true } } },
+        },
+        referredRestaurant: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            owner: { select: { name: true, email: true } },
+          },
+        },
+        rewards: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
 }

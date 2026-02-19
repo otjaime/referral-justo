@@ -10,6 +10,7 @@ const router = Router();
 const controller = new ReferralController();
 
 router.get('/my-code', authenticate, asyncHandler(controller.getMyCode));
+router.get('/admin/all', authenticate, requireAdmin, asyncHandler(controller.getAll));
 router.get('/validate/:code', validateParams(validateCodeParamsSchema), asyncHandler(controller.validateCode));
 router.post('/:id/qualify', authenticate, requireAdmin, validateParams(qualifyParamsSchema), asyncHandler(controller.qualify));
 router.get('/sent', authenticate, asyncHandler(controller.getSent));
