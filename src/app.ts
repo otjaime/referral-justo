@@ -10,6 +10,8 @@ import { rewardRoutes } from './modules/reward/reward.routes';
 
 const app = express();
 
+const publicDir = path.join(process.cwd(), 'public');
+
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -39,7 +41,7 @@ app.use(cors());
 app.use(express.json());
 
 // Static files
-app.use(express.static(path.join(__dirname, '..', 'public')));
+app.use(express.static(publicDir));
 
 // Health check
 app.get('/health', (_req, res) => {
@@ -54,7 +56,7 @@ app.use('/rewards', rewardRoutes);
 
 // SPA catch-all (after API routes, before error handler)
 app.get('{*path}', (_req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+  res.sendFile(path.join(publicDir, 'index.html'));
 });
 
 app.use(errorHandler);
