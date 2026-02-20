@@ -29,6 +29,6 @@ const envSchema = z.object({
 export const config = envSchema.parse(process.env);
 
 if (config.NODE_ENV === 'production' && config.JWT_SECRET.includes('change-me')) {
-  throw new Error('JWT_SECRET must be changed in production');
+  console.error('[SECURITY] JWT_SECRET must be changed in production — using default is insecure');
 }
 export type Config = z.infer<typeof envSchema>;

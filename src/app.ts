@@ -40,6 +40,12 @@ app.use(
 const corsOrigin = config.CORS_ORIGIN === '*' ? true : config.CORS_ORIGIN.split(',');
 app.use(cors({ origin: corsOrigin, credentials: true }));
 app.use(express.json({ limit: '1mb' }));
+
+// Health check (before rate limiter so platform checks are never blocked)
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok' });
+});
+
 app.use(globalLimiter);
 
 // Request logging
@@ -53,11 +59,6 @@ app.use((req, _res, next) => {
 
 // Static files
 app.use(express.static(publicDir));
-
-// Health check
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok' });
-});
 
 // API routes
 app.use('/auth', authRoutes);
