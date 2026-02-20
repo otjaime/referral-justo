@@ -24,6 +24,7 @@ app.use(
         scriptSrc: [
           "'self'",
           "'unsafe-inline'",
+          "'unsafe-eval'",
           'https://cdn.tailwindcss.com',
           'https://unpkg.com',
         ],
