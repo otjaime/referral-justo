@@ -784,6 +784,207 @@
         </div>
 
         ${analytics && html`<${React.Fragment}>
+          <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-justo-900 rounded-2xl shadow-xl p-6 text-white">
+            <div className="flex items-center gap-2 mb-6">
+              <svg className="h-5 w-5 text-justo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+              <h3 className="text-lg font-semibold">Growth Intelligence</h3>
+              <span className="ml-auto text-xs text-gray-400 bg-white/10 px-2 py-0.5 rounded-full">Tiempo real</span>
+            </div>
+
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              ${function() {
+                var gm = analytics.growthMetrics;
+                var k = gm.kFactor.allTime;
+                var kColor = k >= 1 ? 'from-green-500/20 to-green-600/10 border-green-500/30' : k >= 0.5 ? 'from-yellow-500/20 to-yellow-600/10 border-yellow-500/30' : 'from-red-500/20 to-red-600/10 border-red-500/30';
+                var kLabel = k >= 1 ? 'Crecimiento viral' : k >= 0.5 ? 'Pre-viral' : 'Sub-viral';
+                var kTextColor = k >= 1 ? 'text-green-400' : k >= 0.5 ? 'text-yellow-400' : 'text-red-400';
+                var vel = gm.velocity;
+                var trendColor = vel.trend >= 0 ? 'text-green-400' : 'text-red-400';
+                var trendArrow = vel.trend >= 0 ? 'M5 10l7-7m0 0l7 7m-7-7v18' : 'M19 14l-7 7m0 0l-7-7m7 7V3';
+                return html`<${React.Fragment}>
+                  <div className=${'bg-gradient-to-br border rounded-xl p-4 ' + kColor}>
+                    <p className="text-xs text-gray-400 font-medium mb-1">Coeficiente Viral (K)</p>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-3xl font-bold text-white">${k}</span>
+                      <span className=${'text-xs font-bold ' + kTextColor}>${kLabel}</span>
+                    </div>
+                    <div className="flex items-center gap-3 mt-2 text-xs text-gray-400">
+                      <span>All-time: ${k}</span>
+                      <span>30d: ${gm.kFactor.last30d}</span>
+                    </div>
+                  </div>
+                  <div className="bg-gradient-to-br from-ocean-500/20 to-ocean-600/10 border border-ocean-500/30 rounded-xl p-4">
+                    <p className="text-xs text-gray-400 font-medium mb-1">Ciclo Viral</p>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-3xl font-bold text-white">${gm.viralCycleTimeDays !== null ? gm.viralCycleTimeDays : '--'}</span>
+                      ${gm.viralCycleTimeDays !== null && html`<span className="text-sm text-gray-400">dias</span>`}
+                    </div>
+                    <p className="text-xs text-gray-400 mt-2">${gm.viralCycleTimeDays !== null ? 'Referido → refiere a otro' : 'Sin ciclos completados'}</p>
+                  </div>
+                  <div className="bg-gradient-to-br from-justo-500/20 to-justo-600/10 border border-justo-500/30 rounded-xl p-4">
+                    <p className="text-xs text-gray-400 font-medium mb-1">Velocidad Semanal</p>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-3xl font-bold text-white">${vel.currentWeeklyAvg}</span>
+                      <span className="text-sm text-gray-400">/sem</span>
+                    </div>
+                    <div className="flex items-center gap-1 mt-2">
+                      <svg className=${'h-3 w-3 ' + trendColor} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d=${trendArrow}/></svg>
+                      <span className=${'text-xs font-bold ' + trendColor}>${vel.trend > 0 ? '+' : ''}${vel.trend}%</span>
+                      <span className="text-xs text-gray-500">vs previas</span>
+                    </div>
+                  </div>
+                  <div className="bg-gradient-to-br from-green-500/20 to-green-600/10 border border-green-500/30 rounded-xl p-4">
+                    <p className="text-xs text-gray-400 font-medium mb-1">ROI Estimado</p>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-3xl font-bold text-white">${gm.revenueImpact.programROI.toLocaleString('es-CL')}%</span>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-2">Payback: ${gm.revenueImpact.paybackDays} dias</p>
+                  </div>
+                </${React.Fragment}>`;
+              }()}
+            </div>
+
+            ${function() {
+              var gm = analytics.growthMetrics;
+              var proj = gm.projections;
+              var cur = analytics.totals.restaurants;
+              var maxProj = Math.max(proj.d90, cur, 1);
+              return html`<div className="mb-6">
+                <p className="text-xs text-gray-400 font-medium mb-3">Proyeccion de Crecimiento (basado en K=${gm.kFactor.allTime}, ciclo=${gm.viralCycleTimeDays || '?'}d)</p>
+                <div className="relative">
+                  <div className="h-8 bg-white/5 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-justo-500 to-ocean-400 rounded-full transition-all duration-700" style=${{ width: Math.min(100, Math.round((cur / maxProj) * 100)) + '%' }} />
+                  </div>
+                  <div className="flex justify-between mt-2 text-xs">
+                    <div className="text-center">
+                      <p className="font-bold text-white">${cur}</p>
+                      <p className="text-gray-500">Hoy</p>
+                    </div>
+                    ${proj.d30 > 0 && html`<div className="text-center">
+                      <p className="font-bold text-justo-300">${proj.d30}</p>
+                      <p className="text-gray-500">30d</p>
+                    </div>`}
+                    ${proj.d60 > 0 && html`<div className="text-center">
+                      <p className="font-bold text-ocean-300">${proj.d60}</p>
+                      <p className="text-gray-500">60d</p>
+                    </div>`}
+                    ${proj.d90 > 0 && html`<div className="text-center">
+                      <p className="font-bold text-green-300">${proj.d90}</p>
+                      <p className="text-gray-500">90d</p>
+                    </div>`}
+                  </div>
+                </div>
+              </div>`;
+            }()}
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              ${function() {
+                var gm = analytics.growthMetrics;
+                var nh = gm.networkHealth;
+                var edges = analytics.networkEdges || [];
+                var childrenMap = {};
+                edges.forEach(function(e) {
+                  if (!childrenMap[e.referrerId]) childrenMap[e.referrerId] = [];
+                  childrenMap[e.referrerId].push(e);
+                });
+                var allReferredIds = {};
+                edges.forEach(function(e) { allReferredIds[e.referredId] = true; });
+                var rootIds = [];
+                edges.forEach(function(e) { if (!allReferredIds[e.referrerId] && rootIds.indexOf(e.referrerId) === -1) rootIds.push(e.referrerId); });
+                function getDepth(nid, vis) {
+                  if (vis[nid]) return 0; vis[nid] = true;
+                  var ch = childrenMap[nid] || [];
+                  if (ch.length === 0) return 0;
+                  var mx = 0; ch.forEach(function(c) { var d = getDepth(c.referredId, vis); if (d > mx) mx = d; });
+                  return 1 + mx;
+                }
+                var maxD = 0;
+                rootIds.forEach(function(r) { var d = getDepth(r, {}); if (d > maxD) maxD = d; });
+                var totalChildren = 0; var activeNodes = 0;
+                Object.keys(childrenMap).forEach(function(k) { totalChildren += childrenMap[k].length; activeNodes++; });
+                var branchFactor = activeNodes > 0 ? Math.round((totalChildren / activeNodes) * 100) / 100 : 0;
+
+                return html`<div className="bg-white/5 rounded-xl p-4 border border-white/10">
+                  <p className="text-sm font-semibold text-white mb-3">Salud de Red</p>
+                  <div className="space-y-3">
+                    <div>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="text-gray-400">Tasa de Activacion</span>
+                        <span className="font-bold text-white">${nh.activationRate}%</span>
+                      </div>
+                      <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                        <div className="h-full bg-justo-400 rounded-full" style=${{ width: Math.min(100, nh.activationRate) + '%' }} />
+                      </div>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-400">Referidores Activos</span>
+                      <span className="text-white">${nh.activeReferrers} de ${nh.usersWithCodes}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-400">Profundidad Max.</span>
+                      <span className="text-white">${maxD + 1} niveles</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-400">Factor de Ramificacion</span>
+                      <span className="text-white">${branchFactor}x</span>
+                    </div>
+                  </div>
+                </div>`;
+              }()}
+              ${function() {
+                var ri = analytics.growthMetrics.revenueImpact;
+                return html`<div className="bg-white/5 rounded-xl p-4 border border-white/10">
+                  <p className="text-sm font-semibold text-white mb-3">Revenue Impact *</p>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-400">Revenue Mensual Est.</span>
+                      <span className="font-bold text-green-400">${formatCLP(ri.estimatedMonthlyRevenue)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-400">Revenue Anual Est.</span>
+                      <span className="font-bold text-green-300">${formatCLP(ri.estimatedAnnualRevenue)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-400">Costo del Programa</span>
+                      <span className="text-red-400">${formatCLP(analytics.unitEconomics.totalProgramSpend)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-400">Restaurantes Calificados</span>
+                      <span className="text-white">${ri.qualifiedRestaurants}</span>
+                    </div>
+                    <div className="pt-2 border-t border-white/10 text-xs text-gray-500">
+                      * Supuestos: ${formatCLP(ri.assumptions.monthlyRevenuePerRestaurant)}/rest/mes, ${Math.round(ri.assumptions.commissionRate * 100)}% comision
+                    </div>
+                  </div>
+                </div>`;
+              }()}
+            </div>
+
+            ${function() {
+              var vel = analytics.growthMetrics.velocity.weekly || [];
+              if (vel.length === 0) return null;
+              var maxW = 0;
+              vel.forEach(function(w) { if (w.total > maxW) maxW = w.total; });
+              return html`<div className="mt-4 pt-4 border-t border-white/10">
+                <p className="text-xs text-gray-400 font-medium mb-2">Velocidad Semanal (ultimas 12 semanas)</p>
+                <div className="flex items-end gap-1 h-12">
+                  ${vel.map(function(w) {
+                    var h = maxW > 0 ? Math.max(Math.round((w.total / maxW) * 48), 4) : 4;
+                    var hq = maxW > 0 ? Math.round((w.qualified / maxW) * 48) : 0;
+                    return html`<div key=${w.week} className="flex-1 relative" style=${{ height: '48px' }}>
+                      <div className="absolute bottom-0 left-0 right-0 bg-white/10 rounded-t-sm" style=${{ height: h + 'px' }} />
+                      ${hq > 0 && html`<div className="absolute bottom-0 left-0 right-0 bg-justo-400/60 rounded-t-sm" style=${{ height: hq + 'px' }} />`}
+                    </div>`;
+                  })}
+                </div>
+                <div className="flex justify-between text-xs text-gray-500 mt-1">
+                  <span>${vel.length > 0 ? vel[0].week.slice(5) : ''}</span>
+                  <span>${vel.length > 0 ? vel[vel.length - 1].week.slice(5) : ''}</span>
+                </div>
+              </div>`;
+            }()}
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 border-l-4 border-l-justo-500 p-5">
               <p className="text-sm text-gray-500 font-medium">Total Referidos</p>
