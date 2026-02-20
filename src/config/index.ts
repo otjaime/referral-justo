@@ -10,6 +10,9 @@ const envSchema = z.object({
   JWT_EXPIRES_IN: z.string().default('7d'),
   PORT: z.coerce.number().default(3000),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  CORS_ORIGIN: z.string().default('*'),
+  RATE_LIMIT_WINDOW_MS: z.coerce.number().default(15 * 60 * 1000),
+  RATE_LIMIT_MAX: z.coerce.number().default(100),
 
   REFERRAL_CODE_PREFIX: z.string().default('JUSTO'),
   REFERRAL_CODE_LENGTH: z.coerce.number().default(8),
@@ -24,4 +27,8 @@ const envSchema = z.object({
 });
 
 export const config = envSchema.parse(process.env);
+
+if (config.NODE_ENV === 'production' && config.JWT_SECRET.includes('change-me')) {
+  throw new Error('JWT_SECRET must be changed in production');
+}
 export type Config = z.infer<typeof envSchema>;

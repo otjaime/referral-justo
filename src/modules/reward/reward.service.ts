@@ -2,15 +2,24 @@ import {
   BeneficiaryType,
   ReferralStatus,
   RewardStatus,
-  RewardType,
 } from '@prisma/client';
 import prisma from '../../config/prisma';
 import { config } from '../../config';
 import {
-  NotFoundError,
   ValidationError,
   ForbiddenError,
 } from '../../utils/errors';
+
+const VALID_REWARD_TYPES = ['CREDITS', 'DISCOUNT', 'FEE_WAIVER', 'CUSTOM'] as const;
+type ValidRewardType = typeof VALID_REWARD_TYPES[number];
+
+function toRewardType(value: string): ValidRewardType {
+  const upper = value.toUpperCase();
+  if (!VALID_REWARD_TYPES.includes(upper as ValidRewardType)) {
+    throw new ValidationError(`Invalid reward type: ${value}`);
+  }
+  return upper as ValidRewardType;
+}
 
 export class RewardService {
   async emitRewards(referralId: string) {
@@ -41,7 +50,7 @@ export class RewardService {
           referralId,
           beneficiaryId: referral.referralCode.referrerUserId,
           beneficiaryType: BeneficiaryType.REFERRER,
-          rewardType: config.REFERRAL_REWARD_REFERRER_TYPE.toUpperCase() as RewardType,
+          rewardType: toRewardType(config.REFERRAL_REWARD_REFERRER_TYPE),
           amount: config.REFERRAL_REWARD_REFERRER_AMOUNT,
           description: config.REFERRAL_REWARD_REFERRER_DESCRIPTION,
           status: RewardStatus.ISSUED,
@@ -55,7 +64,7 @@ export class RewardService {
           referralId,
           beneficiaryId: referral.referredRestaurant.ownerId,
           beneficiaryType: BeneficiaryType.REFERRED,
-          rewardType: config.REFERRAL_REWARD_REFERRED_TYPE.toUpperCase() as RewardType,
+          rewardType: toRewardType(config.REFERRAL_REWARD_REFERRED_TYPE),
           amount: config.REFERRAL_REWARD_REFERRED_AMOUNT,
           description: config.REFERRAL_REWARD_REFERRED_DESCRIPTION,
           status: RewardStatus.ISSUED,

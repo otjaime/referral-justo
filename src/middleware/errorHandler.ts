@@ -47,10 +47,11 @@ export function errorHandler(
     stack: err.stack,
   });
 
+  const isProduction = process.env.NODE_ENV === 'production';
   res.status(500).json({
     error: {
       code: 'INTERNAL_ERROR',
-      message: err.message || 'An unexpected error occurred',
+      message: isProduction ? 'An unexpected error occurred' : (err.message || 'An unexpected error occurred'),
     },
   });
 }
