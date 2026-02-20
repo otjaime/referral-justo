@@ -1,12 +1,14 @@
 import { Router } from 'express';
 import { RestaurantController } from './restaurant.controller';
-import { authenticate } from '../../middleware/auth';
+import { authenticate, requireAdmin } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { asyncHandler } from '../../middleware/asyncHandler';
 import { registerRestaurantSchema } from './restaurant.schema';
 
 const router = Router();
 const controller = new RestaurantController();
+
+router.get('/admin/all', authenticate, requireAdmin, asyncHandler(controller.getAll));
 
 router.post(
   '/register',

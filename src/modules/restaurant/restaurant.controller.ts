@@ -12,4 +12,9 @@ export class RestaurantController {
     });
     res.status(201).json(result);
   }
+
+  async getAll(_req: Request, res: Response) {
+    const restaurants = await restaurantService.getAllRestaurants();
+    res.json(restaurants);
+  }
 }

@@ -61,6 +61,16 @@ interface WeeklyVelocity {
   qualified: number;
 }
 
+interface UserGrowthEntry {
+  month: string;
+  count: number;
+}
+
+interface ReferredHealthRow {
+  referredTotal: number;
+  referredActive: number;
+}
+
 // Business assumptions for revenue impact estimates
 const ASSUMED_MONTHLY_REVENUE_PER_RESTAURANT = 3000000; // $3M CLP
 const ASSUMED_COMMISSION_RATE = 0.15; // 15%
@@ -84,6 +94,10 @@ export class AnalyticsService {
       kFactorDataArr,
       cycleTimeEntries,
       weeklyVelocity,
+      restaurantsByStatus,
+      referredHealthArr,
+      userGrowthTimeline,
+      rewardsByType,
     ] = await Promise.all([
       prisma.user.count(),
       prisma.restaurant.count(),
@@ -220,6 +234,38 @@ export class AnalyticsService {
         GROUP BY DATE_TRUNC('week', r.created_at)
         ORDER BY "week" ASC
       `,
+
+      // Restaurant status distribution
+      prisma.restaurant.groupBy({
+        by: ['status'],
+        _count: { id: true },
+      }),
+
+      // Referred restaurant retention
+      prisma.$queryRaw<ReferredHealthRow[]>`
+        SELECT
+          COUNT(rest.id)::int AS "referredTotal",
+          COUNT(rest.id) FILTER (WHERE rest.status = 'ACTIVE')::int AS "referredActive"
+        FROM restaurants rest
+        INNER JOIN referrals ref ON ref.referred_restaurant_id = rest.id
+      `,
+
+      // User growth by month
+      prisma.$queryRaw<UserGrowthEntry[]>`
+        SELECT
+          TO_CHAR(u.created_at, 'YYYY-MM') AS "month",
+          COUNT(u.id)::int AS "count"
+        FROM users u
+        GROUP BY TO_CHAR(u.created_at, 'YYYY-MM')
+        ORDER BY "month" ASC
+      `,
+
+      // Reward breakdown by type
+      prisma.reward.groupBy({
+        by: ['rewardType'],
+        _count: { id: true },
+        _sum: { amount: true },
+      }),
     ]);
 
     // Referral funnel
@@ -328,6 +374,42 @@ export class AnalyticsService {
       ? Math.round(((recentAvg - priorAvg) / priorAvg) * 100)
       : 0;
 
+    // ── Restaurant Health ──────────────────────────────
+    const statusDist: Record<string, number> = {};
+    for (const row of restaurantsByStatus) {
+      statusDist[row.status] = row._count.id;
+    }
+    const referredHealth = referredHealthArr[0] || { referredTotal: 0, referredActive: 0 };
+    const referredRetentionRate = referredHealth.referredTotal > 0
+      ? Math.round((referredHealth.referredActive / referredHealth.referredTotal) * 1000) / 10
+      : 0;
+    const directCount = restaurantCount - (referredHealth.referredTotal || 0);
+
+    // ── Reward Breakdown by Type ──────────────────────
+    const rewardBreakdown = rewardsByType.map(row => ({
+      type: row.rewardType,
+      count: row._count.id,
+      totalAmount: row._sum.amount || 0,
+    }));
+
+    // ── Channel Health Score (0–100) ──────────────────
+    const kScore = Math.min(kFactorAllTime / 1.0, 1.0) * 30;
+    const convScore = Math.min(conversionRate / 100, 1.0) * 25;
+    const actScore = Math.min(activationRate / 100, 1.0) * 20;
+    const roiScore = Math.min(Math.max(programROI, 0) / 500, 1.0) * 15;
+    const retScore = (referredRetentionRate / 100) * 10;
+    const channelScoreRaw = Math.round(kScore + convScore + actScore + roiScore + retScore);
+    const channelScoreVal = Math.min(channelScoreRaw, 100);
+
+    const gradeMap: [number, string, string][] = [
+      [80, 'A', 'Canal viral activo — crecimiento sostenido'],
+      [60, 'B', 'Canal saludable — optimizar activacion para escalar'],
+      [40, 'C', 'Canal pre-viral — enfocarse en conversion y activacion'],
+      [20, 'D', 'Canal incipiente — mejorar propuesta de valor del referido'],
+      [0, 'F', 'Canal inactivo — requiere intervencion urgente'],
+    ];
+    const gradeEntry = gradeMap.find(([threshold]) => channelScoreVal >= threshold) || gradeMap[gradeMap.length - 1];
+
     return {
       totals: {
         users: userCount,
@@ -386,6 +468,20 @@ export class AnalyticsService {
           currentWeeklyAvg: Math.round(recentAvg * 10) / 10,
         },
       },
+      channelScore: {
+        score: channelScoreVal,
+        grade: gradeEntry[1],
+        label: gradeEntry[2],
+      },
+      restaurantHealth: {
+        statusDistribution: statusDist,
+        referredTotal: referredHealth.referredTotal,
+        referredActive: referredHealth.referredActive,
+        referredRetentionRate,
+        directCount,
+      },
+      userGrowth: userGrowthTimeline,
+      rewardBreakdown,
     };
   }
 

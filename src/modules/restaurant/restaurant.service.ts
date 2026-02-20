@@ -41,4 +41,28 @@ export class RestaurantService {
 
     return { restaurant };
   }
+
+  async getAllRestaurants() {
+    return prisma.restaurant.findMany({
+      include: {
+        owner: {
+          select: { id: true, name: true, email: true },
+        },
+        referral: {
+          select: {
+            id: true,
+            status: true,
+            createdAt: true,
+            referralCode: {
+              select: {
+                code: true,
+                referrer: { select: { id: true, name: true } },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
 }

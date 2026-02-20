@@ -131,4 +131,28 @@ export class RewardService {
       },
     });
   }
+
+  async getAllRewards() {
+    return prisma.reward.findMany({
+      include: {
+        beneficiary: {
+          select: { id: true, name: true, email: true },
+        },
+        referral: {
+          select: {
+            id: true,
+            status: true,
+            referredRestaurant: { select: { id: true, name: true } },
+            referralCode: {
+              select: {
+                code: true,
+                referrer: { select: { id: true, name: true } },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { issuedAt: 'desc' },
+    });
+  }
 }

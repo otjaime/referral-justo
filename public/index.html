@@ -305,6 +305,17 @@
         EXPIRED: ['Expirado', 'bg-gray-500/15 text-gray-400 border border-gray-500/20'],
         ISSUED: ['Disponible', 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/20'],
         REDEEMED: ['Canjeado', 'bg-blue-500/15 text-blue-300 border border-blue-500/20'],
+        ACTIVE: ['Activo', 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/20'],
+        SUSPENDED: ['Suspendido', 'bg-red-500/15 text-red-300 border border-red-500/20'],
+        CANCELLED: ['Cancelado', 'bg-gray-500/15 text-gray-400 border border-gray-500/20'],
+        ADMIN: ['Admin', 'bg-purple-500/15 text-purple-300 border border-purple-500/20'],
+        USER: ['Usuario', 'bg-sky-500/15 text-sky-300 border border-sky-500/20'],
+        REFERRER: ['Referidor', 'bg-justo-500/15 text-justo-300 border border-justo-500/20'],
+        REFERRED: ['Referido', 'bg-ocean-500/15 text-ocean-300 border border-ocean-500/20'],
+        CREDITS: ['Creditos', 'bg-green-500/15 text-green-300 border border-green-500/20'],
+        DISCOUNT: ['Descuento', 'bg-orange-500/15 text-orange-300 border border-orange-500/20'],
+        FEE_WAIVER: ['Exencion', 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/20'],
+        CUSTOM: ['Custom', 'bg-pink-500/15 text-pink-300 border border-pink-500/20'],
       };
       var entry = map[props.status] || [props.status, 'bg-gray-500/15 text-gray-400 border border-gray-500/20'];
       return html`<span className=${'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ' + entry[1]}>${entry[0]}</span>`;
@@ -1088,6 +1099,266 @@
       </div>`;
     }
 
+    // ─── Admin Tab Components ──────────────────────────
+    function AdminUsersTab(props) {
+      var users = props.users;
+      var _search = useState(''), search = _search[0], setSearch = _search[1];
+      var _page = useState(1), page = _page[0], setPage = _page[1];
+      var _role = useState('ALL'), roleFilter = _role[0], setRoleFilter = _role[1];
+
+      var roleFiltered = roleFilter === 'ALL' ? users : users.filter(function(u) { return u.role === roleFilter; });
+      var filtered = search ? roleFiltered.filter(function(u) {
+        var q = search.toLowerCase();
+        return (u.name && u.name.toLowerCase().indexOf(q) !== -1)
+          || (u.email && u.email.toLowerCase().indexOf(q) !== -1);
+      }) : roleFiltered;
+      var perPage = 10;
+      var paginated = filtered.slice((page - 1) * perPage, page * perPage);
+      var roles = ['ALL', 'ADMIN', 'USER'];
+      var roleLabels = { ALL: 'Todos', ADMIN: 'Admins', USER: 'Usuarios' };
+
+      return html`<div className="space-y-4">
+        <div className="grid grid-cols-3 gap-4">
+          <${SpotlightCard} style=${{ '--spotlight-color': 'rgba(124,58,237,0.10)' }}>
+            <p className="text-sm text-gray-400 font-medium">Total Usuarios</p>
+            <p className="text-3xl font-bold text-white mt-1"><${AnimatedCounter} value=${users.length} /></p>
+          </${SpotlightCard}>
+          <${SpotlightCard} style=${{ '--spotlight-color': 'rgba(168,85,247,0.10)' }}>
+            <p className="text-sm text-gray-400 font-medium">Admins</p>
+            <p className="text-3xl font-bold text-white mt-1"><${AnimatedCounter} value=${users.filter(function(u) { return u.role === 'ADMIN'; }).length} /></p>
+          </${SpotlightCard}>
+          <${SpotlightCard} style=${{ '--spotlight-color': 'rgba(56,189,248,0.10)' }}>
+            <p className="text-sm text-gray-400 font-medium">Usuarios</p>
+            <p className="text-3xl font-bold text-white mt-1"><${AnimatedCounter} value=${users.filter(function(u) { return u.role === 'USER'; }).length} /></p>
+          </${SpotlightCard}>
+        </div>
+        <div className="flex items-center gap-3 flex-wrap">
+          ${roles.map(function(r) {
+            return html`<button key=${r} onClick=${function() { setRoleFilter(r); setPage(1); }}
+              className=${'px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ' + (roleFilter === r ? 'bg-justo-500 text-white' : 'bg-white/5 border border-white/10 text-gray-400 hover:bg-white/10')}>
+              ${roleLabels[r]}${r !== 'ALL' ? ' (' + users.filter(function(u) { return u.role === r; }).length + ')' : ''}
+            </button>`;
+          })}
+        </div>
+        <${SearchInput} value=${search} onInput=${function(e) { setSearch(e.target.value); setPage(1); }} placeholder="Buscar por nombre o email..." />
+        <${SpotlightCard}>
+          ${filtered.length === 0
+            ? html`<${EmptyState} title="Sin usuarios" description="No hay usuarios con este filtro." />`
+            : html`<div className="overflow-x-auto"><table className="w-full">
+                <thead><tr className="border-b border-white/[0.06]">
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Usuario</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Rol</th>
+                  <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase">Restaurantes</th>
+                  <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase">Codigos</th>
+                  <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase">Recompensas</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Registro</th>
+                </tr></thead>
+                <tbody>${paginated.map(function(u) {
+                  return html`<tr key=${u.id} className="border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02] transition-colors">
+                    <td className="px-4 py-4">
+                      <p className="text-sm font-medium text-white">${u.name}</p>
+                      <p className="text-xs text-gray-500">${u.email}</p>
+                    </td>
+                    <td className="px-4 py-4"><${StatusBadge} status=${u.role} /></td>
+                    <td className="px-4 py-4 text-center text-sm font-medium text-gray-300">${u._count.restaurants}</td>
+                    <td className="px-4 py-4 text-center text-sm font-medium text-gray-300">${u._count.referralCodes}</td>
+                    <td className="px-4 py-4 text-center text-sm font-medium text-gray-300">${u._count.rewards}</td>
+                    <td className="px-4 py-4 text-sm text-gray-400">${new Date(u.createdAt).toLocaleDateString('es-CL')}</td>
+                  </tr>`;
+                })}</tbody>
+              </table></div>
+              <${Pagination} page=${page} total=${filtered.length} perPage=${perPage} onPageChange=${setPage} />`}
+        </${SpotlightCard}>
+      </div>`;
+    }
+
+    function AdminRestaurantsTab(props) {
+      var restaurants = props.restaurants;
+      var _search = useState(''), search = _search[0], setSearch = _search[1];
+      var _page = useState(1), page = _page[0], setPage = _page[1];
+      var _status = useState('ALL'), statusFilter = _status[0], setStatusFilter = _status[1];
+
+      var statusFiltered = statusFilter === 'ALL' ? restaurants : restaurants.filter(function(r) { return r.status === statusFilter; });
+      var filtered = search ? statusFiltered.filter(function(r) {
+        var q = search.toLowerCase();
+        return (r.name && r.name.toLowerCase().indexOf(q) !== -1)
+          || (r.owner && r.owner.name && r.owner.name.toLowerCase().indexOf(q) !== -1)
+          || (r.owner && r.owner.email && r.owner.email.toLowerCase().indexOf(q) !== -1);
+      }) : statusFiltered;
+      var perPage = 10;
+      var paginated = filtered.slice((page - 1) * perPage, page * perPage);
+      var statuses = ['ALL', 'PENDING', 'ACTIVE', 'SUSPENDED', 'CANCELLED'];
+      var statusLabels = { ALL: 'Todos', PENDING: 'Pendientes', ACTIVE: 'Activos', SUSPENDED: 'Suspendidos', CANCELLED: 'Cancelados' };
+
+      return html`<div className="space-y-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <${SpotlightCard} style=${{ '--spotlight-color': 'rgba(124,58,237,0.10)' }}>
+            <p className="text-sm text-gray-400 font-medium">Total</p>
+            <p className="text-3xl font-bold text-white mt-1"><${AnimatedCounter} value=${restaurants.length} /></p>
+          </${SpotlightCard}>
+          <${SpotlightCard} style=${{ '--spotlight-color': 'rgba(16,185,129,0.10)' }}>
+            <p className="text-sm text-gray-400 font-medium">Activos</p>
+            <p className="text-3xl font-bold text-white mt-1"><${AnimatedCounter} value=${restaurants.filter(function(r) { return r.status === 'ACTIVE'; }).length} /></p>
+          </${SpotlightCard}>
+          <${SpotlightCard} style=${{ '--spotlight-color': 'rgba(234,179,8,0.10)' }}>
+            <p className="text-sm text-gray-400 font-medium">Pendientes</p>
+            <p className="text-3xl font-bold text-white mt-1"><${AnimatedCounter} value=${restaurants.filter(function(r) { return r.status === 'PENDING'; }).length} /></p>
+          </${SpotlightCard}>
+          <${SpotlightCard} style=${{ '--spotlight-color': 'rgba(59,130,246,0.10)' }}>
+            <p className="text-sm text-gray-400 font-medium">Referidos</p>
+            <p className="text-3xl font-bold text-white mt-1"><${AnimatedCounter} value=${restaurants.filter(function(r) { return r.referral; }).length} /></p>
+          </${SpotlightCard}>
+        </div>
+        <div className="flex items-center gap-3 flex-wrap">
+          ${statuses.map(function(s) {
+            return html`<button key=${s} onClick=${function() { setStatusFilter(s); setPage(1); }}
+              className=${'px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ' + (statusFilter === s ? 'bg-justo-500 text-white' : 'bg-white/5 border border-white/10 text-gray-400 hover:bg-white/10')}>
+              ${statusLabels[s]}${s !== 'ALL' ? ' (' + restaurants.filter(function(r) { return r.status === s; }).length + ')' : ''}
+            </button>`;
+          })}
+        </div>
+        <${SearchInput} value=${search} onInput=${function(e) { setSearch(e.target.value); setPage(1); }} placeholder="Buscar por restaurante, dueno o email..." />
+        <${SpotlightCard}>
+          ${filtered.length === 0
+            ? html`<${EmptyState} title="Sin restaurantes" description="No hay restaurantes con este filtro." />`
+            : html`<div className="overflow-x-auto"><table className="w-full">
+                <thead><tr className="border-b border-white/[0.06]">
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Restaurante</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Dueno</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Estado</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Referido por</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Creado</th>
+                </tr></thead>
+                <tbody>${paginated.map(function(r) {
+                  var ref = r.referral;
+                  var refInfo = ref && ref.referralCode ? ref.referralCode : null;
+                  return html`<tr key=${r.id} className="border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02] transition-colors">
+                    <td className="px-4 py-4">
+                      <p className="text-sm font-medium text-white">${r.name}</p>
+                    </td>
+                    <td className="px-4 py-4">
+                      <p className="text-sm font-medium text-white">${r.owner && r.owner.name}</p>
+                      <p className="text-xs text-gray-500">${r.owner && r.owner.email}</p>
+                    </td>
+                    <td className="px-4 py-4"><${StatusBadge} status=${r.status} /></td>
+                    <td className="px-4 py-4">
+                      ${refInfo
+                        ? html`<div>
+                            <p className="text-sm text-justo-400 font-mono">${refInfo.code}</p>
+                            <p className="text-xs text-gray-500">${refInfo.referrer && refInfo.referrer.name}</p>
+                          </div>`
+                        : html`<span className="text-xs text-gray-600">Directo</span>`}
+                    </td>
+                    <td className="px-4 py-4 text-sm text-gray-400">${new Date(r.createdAt).toLocaleDateString('es-CL')}</td>
+                  </tr>`;
+                })}</tbody>
+              </table></div>
+              <${Pagination} page=${page} total=${filtered.length} perPage=${perPage} onPageChange=${setPage} />`}
+        </${SpotlightCard}>
+      </div>`;
+    }
+
+    function AdminRewardsTab(props) {
+      var rewards = props.rewards;
+      var _search = useState(''), search = _search[0], setSearch = _search[1];
+      var _page = useState(1), page = _page[0], setPage = _page[1];
+      var _status = useState('ALL'), statusFilter = _status[0], setStatusFilter = _status[1];
+      var _type = useState('ALL'), typeFilter = _type[0], setTypeFilter = _type[1];
+
+      var statusFiltered = statusFilter === 'ALL' ? rewards : rewards.filter(function(rw) { return rw.status === statusFilter; });
+      var typeFiltered = typeFilter === 'ALL' ? statusFiltered : statusFiltered.filter(function(rw) { return rw.rewardType === typeFilter; });
+      var filtered = search ? typeFiltered.filter(function(rw) {
+        var q = search.toLowerCase();
+        return (rw.beneficiary && rw.beneficiary.name && rw.beneficiary.name.toLowerCase().indexOf(q) !== -1)
+          || (rw.beneficiary && rw.beneficiary.email && rw.beneficiary.email.toLowerCase().indexOf(q) !== -1)
+          || (rw.referral && rw.referral.referredRestaurant && rw.referral.referredRestaurant.name && rw.referral.referredRestaurant.name.toLowerCase().indexOf(q) !== -1);
+      }) : typeFiltered;
+      var perPage = 10;
+      var paginated = filtered.slice((page - 1) * perPage, page * perPage);
+
+      var statusOpts = ['ALL', 'PENDING', 'ISSUED', 'REDEEMED', 'EXPIRED'];
+      var statusLabels = { ALL: 'Todos', PENDING: 'Pendientes', ISSUED: 'Disponibles', REDEEMED: 'Canjeados', EXPIRED: 'Expirados' };
+      var typeOpts = ['ALL', 'CREDITS', 'DISCOUNT', 'FEE_WAIVER', 'CUSTOM'];
+      var typeLabels = { ALL: 'Todos', CREDITS: 'Creditos', DISCOUNT: 'Descuentos', FEE_WAIVER: 'Exencion', CUSTOM: 'Custom' };
+
+      var totalIssued = 0, totalRedeemed = 0;
+      rewards.forEach(function(rw) {
+        if (rw.amount) {
+          if (rw.status === 'ISSUED' || rw.status === 'REDEEMED') totalIssued += rw.amount;
+          if (rw.status === 'REDEEMED') totalRedeemed += rw.amount;
+        }
+      });
+
+      return html`<div className="space-y-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <${SpotlightCard} style=${{ '--spotlight-color': 'rgba(124,58,237,0.10)' }}>
+            <p className="text-sm text-gray-400 font-medium">Total Recompensas</p>
+            <p className="text-3xl font-bold text-white mt-1"><${AnimatedCounter} value=${rewards.length} /></p>
+          </${SpotlightCard}>
+          <${SpotlightCard} style=${{ '--spotlight-color': 'rgba(16,185,129,0.10)' }}>
+            <p className="text-sm text-gray-400 font-medium">Emitido</p>
+            <p className="text-2xl font-bold text-emerald-400 mt-1">${formatCLP(totalIssued)}</p>
+          </${SpotlightCard}>
+          <${SpotlightCard} style=${{ '--spotlight-color': 'rgba(59,130,246,0.10)' }}>
+            <p className="text-sm text-gray-400 font-medium">Canjeado</p>
+            <p className="text-2xl font-bold text-blue-400 mt-1">${formatCLP(totalRedeemed)}</p>
+          </${SpotlightCard}>
+          <${SpotlightCard} style=${{ '--spotlight-color': 'rgba(234,179,8,0.10)' }}>
+            <p className="text-sm text-gray-400 font-medium">Pendientes</p>
+            <p className="text-3xl font-bold text-white mt-1"><${AnimatedCounter} value=${rewards.filter(function(rw) { return rw.status === 'PENDING'; }).length} /></p>
+          </${SpotlightCard}>
+        </div>
+        <div className="flex items-center gap-3 flex-wrap">
+          ${statusOpts.map(function(s) {
+            return html`<button key=${s} onClick=${function() { setStatusFilter(s); setPage(1); }}
+              className=${'px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ' + (statusFilter === s ? 'bg-justo-500 text-white' : 'bg-white/5 border border-white/10 text-gray-400 hover:bg-white/10')}>
+              ${statusLabels[s]}${s !== 'ALL' ? ' (' + rewards.filter(function(rw) { return rw.status === s; }).length + ')' : ''}
+            </button>`;
+          })}
+        </div>
+        <div className="flex items-center gap-3 flex-wrap">
+          ${typeOpts.map(function(t) {
+            return html`<button key=${t} onClick=${function() { setTypeFilter(t); setPage(1); }}
+              className=${'px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ' + (typeFilter === t ? 'bg-ocean-500 text-white' : 'bg-white/5 border border-white/10 text-gray-400 hover:bg-white/10')}>
+              ${typeLabels[t]}${t !== 'ALL' ? ' (' + rewards.filter(function(rw) { return rw.rewardType === t; }).length + ')' : ''}
+            </button>`;
+          })}
+        </div>
+        <${SearchInput} value=${search} onInput=${function(e) { setSearch(e.target.value); setPage(1); }} placeholder="Buscar por beneficiario o restaurante..." />
+        <${SpotlightCard}>
+          ${filtered.length === 0
+            ? html`<${EmptyState} title="Sin recompensas" description="No hay recompensas con este filtro." />`
+            : html`<div className="overflow-x-auto"><table className="w-full">
+                <thead><tr className="border-b border-white/[0.06]">
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Beneficiario</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Rol</th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">Monto</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Estado</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Restaurante</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                </tr></thead>
+                <tbody>${paginated.map(function(rw) {
+                  var rest = rw.referral && rw.referral.referredRestaurant;
+                  return html`<tr key=${rw.id} className="border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02] transition-colors">
+                    <td className="px-4 py-4">
+                      <p className="text-sm font-medium text-white">${rw.beneficiary && rw.beneficiary.name}</p>
+                      <p className="text-xs text-gray-500">${rw.beneficiary && rw.beneficiary.email}</p>
+                    </td>
+                    <td className="px-4 py-4"><${StatusBadge} status=${rw.rewardType} /></td>
+                    <td className="px-4 py-4"><${StatusBadge} status=${rw.beneficiaryType} /></td>
+                    <td className="px-4 py-4 text-right text-sm font-bold text-justo-400">${rw.amount ? formatCLP(rw.amount) : '--'}</td>
+                    <td className="px-4 py-4"><${StatusBadge} status=${rw.status} /></td>
+                    <td className="px-4 py-4 text-sm text-gray-300">${rest && rest.name}</td>
+                    <td className="px-4 py-4 text-sm text-gray-400">${rw.issuedAt ? new Date(rw.issuedAt).toLocaleDateString('es-CL') : '--'}</td>
+                  </tr>`;
+                })}</tbody>
+              </table></div>
+              <${Pagination} page=${page} total=${filtered.length} perPage=${perPage} onPageChange=${setPage} />`}
+        </${SpotlightCard}>
+      </div>`;
+    }
+
     function AdminPanel() {
       var toast = useToast();
       var _r = useState([]), referrals = _r[0], setReferrals = _r[1];
@@ -1097,10 +1368,26 @@
       var _q = useState(null), qualifyingId = _q[0], setQualifyingId = _q[1];
       var _search = useState(''), search = _search[0], setSearch = _search[1];
       var _page = useState(1), page = _page[0], setPage = _page[1];
+      var _tab = useState('overview'), activeTab = _tab[0], setActiveTab = _tab[1];
+      var _users = useState([]), users = _users[0], setUsers = _users[1];
+      var _rests = useState([]), adminRestaurants = _rests[0], setAdminRestaurants = _rests[1];
+      var _allRw = useState([]), allRewards = _allRw[0], setAllRewards = _allRw[1];
 
       useEffect(function() {
-        Promise.all([api('/referrals/admin/all'), api('/analytics/dashboard')])
-          .then(function(res) { setReferrals(res[0]); setAnalytics(res[1]); })
+        Promise.all([
+          api('/referrals/admin/all'),
+          api('/analytics/dashboard'),
+          api('/auth/admin/users'),
+          api('/restaurants/admin/all'),
+          api('/rewards/admin/all'),
+        ])
+          .then(function(res) {
+            setReferrals(res[0]);
+            setAnalytics(res[1]);
+            setUsers(res[2]);
+            setAdminRestaurants(res[3]);
+            setAllRewards(res[4]);
+          })
           .catch(function(err) { toast.addToast('Error al cargar panel admin', 'error'); })
           .finally(function() { setLoading(false); });
       }, []);
@@ -1175,7 +1462,85 @@
           <p className="text-sm text-gray-500 mt-1">Metricas y gestion del programa de referidos</p>
         </div>
 
-        ${analytics && html`<${React.Fragment}>
+        <div className="flex rounded-xl p-1 gap-1" style=${{ background: 'rgba(255,255,255,0.06)' }}>
+          ${[
+            { id: 'overview', label: 'Resumen', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
+            { id: 'users', label: 'Usuarios (' + users.length + ')', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197' },
+            { id: 'restaurants', label: 'Restaurantes (' + adminRestaurants.length + ')', icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
+            { id: 'rewards', label: 'Recompensas (' + allRewards.length + ')', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1' },
+          ].map(function(tab) {
+            return html`<button key=${tab.id} onClick=${function() { setActiveTab(tab.id); }}
+              className=${'flex-1 py-2.5 px-3 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-2 ' +
+                (activeTab === tab.id ? 'bg-white/10 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5')}>
+              <svg className="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d=${tab.icon}/>
+              </svg>
+              <span className="hidden sm:inline">${tab.label}</span>
+            </button>`;
+          })}
+        </div>
+
+        ${activeTab === 'users' && html`<${AdminUsersTab} users=${users} />`}
+        ${activeTab === 'restaurants' && html`<${AdminRestaurantsTab} restaurants=${adminRestaurants} />`}
+        ${activeTab === 'rewards' && html`<${AdminRewardsTab} rewards=${allRewards} />`}
+
+        ${activeTab === 'overview' && analytics && html`<${React.Fragment}>
+
+          ${analytics.channelScore && html`<div className="relative overflow-hidden bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-2xl shadow-2xl p-6 border border-white/[0.08]">
+            <div className="absolute inset-0 opacity-20" style=${{ background: 'radial-gradient(circle at 15% 50%, ' + (analytics.channelScore.score >= 70 ? 'rgba(16,185,129,0.4)' : analytics.channelScore.score >= 40 ? 'rgba(234,179,8,0.4)' : 'rgba(239,68,68,0.4)') + ' 0%, transparent 60%)' }} />
+            <div className="relative flex flex-col sm:flex-row gap-6 items-center sm:items-start">
+              <div className="flex flex-col items-center gap-1 min-w-[120px]">
+                <div className="relative w-28 h-28">
+                  <svg className="w-28 h-28 -rotate-90" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="8"/>
+                    <circle cx="50" cy="50" r="42" fill="none"
+                      stroke=${analytics.channelScore.score >= 70 ? '#10b981' : analytics.channelScore.score >= 40 ? '#eab308' : '#ef4444'}
+                      strokeWidth="8" strokeLinecap="round"
+                      strokeDasharray=${2 * Math.PI * 42}
+                      strokeDashoffset=${2 * Math.PI * 42 * (1 - analytics.channelScore.score / 100)} />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-3xl font-black text-white">${analytics.channelScore.score}</span>
+                    <span className=${'text-xs font-bold ' + (analytics.channelScore.score >= 70 ? 'text-emerald-400' : analytics.channelScore.score >= 40 ? 'text-yellow-400' : 'text-red-400')}>
+                      Grado ${analytics.channelScore.grade}
+                    </span>
+                  </div>
+                </div>
+                <p className="text-[10px] text-gray-500 text-center">Salud del Canal</p>
+              </div>
+              <div className="flex-1 space-y-4">
+                <div>
+                  <h3 className="text-lg font-bold text-white">Estado del Canal de Referidos</h3>
+                  <p className="text-sm text-gray-400 mt-1">${analytics.channelScore.label}</p>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                  ${function() {
+                    var gm = analytics.growthMetrics;
+                    var k = gm.kFactor.allTime;
+                    var kC = k >= 1 ? 'text-emerald-400' : k >= 0.5 ? 'text-yellow-400' : 'text-red-400';
+                    var conv = analytics.funnel.conversionRate;
+                    var convC = conv >= 50 ? 'text-emerald-400' : conv >= 25 ? 'text-yellow-400' : 'text-red-400';
+                    var roi = gm.revenueImpact.programROI;
+                    var roiC = roi >= 200 ? 'text-emerald-400' : roi >= 50 ? 'text-yellow-400' : 'text-red-400';
+                    var chips = [
+                      { label: 'K-Factor', value: k, suffix: '', cls: kC },
+                      { label: 'Conversion', value: conv, suffix: '%', cls: convC },
+                      { label: 'Usuarios', value: analytics.totals.users, suffix: '', cls: 'text-white' },
+                      { label: 'Restaurantes', value: analytics.totals.restaurants, suffix: '', cls: 'text-white' },
+                      { label: 'ROI', value: roi.toLocaleString('es-CL'), suffix: '%', cls: roiC },
+                    ];
+                    return chips.map(function(c) {
+                      return html`<div key=${c.label} className="bg-white/[0.04] border border-white/[0.08] rounded-lg p-3 text-center">
+                        <p className="text-[10px] text-gray-500 font-medium uppercase tracking-wider">${c.label}</p>
+                        <p className=${'text-lg font-bold mt-0.5 ' + c.cls}>${c.value}${c.suffix}</p>
+                      </div>`;
+                    });
+                  }()}
+                </div>
+              </div>
+            </div>
+          </div>`}
+
           <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-justo-900 rounded-2xl shadow-xl p-6 text-white">
             <div className="flex items-center gap-2 mb-6">
               <svg className="h-5 w-5 text-justo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
@@ -1370,6 +1735,106 @@
               </div>`;
             }()}
           </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            ${analytics.restaurantHealth && html`<${SpotlightCard}>
+              <div className="flex items-center gap-2 mb-4">
+                <svg className="h-5 w-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                <h3 className="text-lg font-semibold text-white">Salud de Restaurantes</h3>
+              </div>
+              ${function() {
+                var rh = analytics.restaurantHealth;
+                var total = analytics.totals.restaurants;
+                var statuses = [
+                  { key: 'ACTIVE', label: 'Activos', color: 'bg-emerald-500', count: rh.statusDistribution.ACTIVE || 0 },
+                  { key: 'PENDING', label: 'Pendientes', color: 'bg-yellow-500', count: rh.statusDistribution.PENDING || 0 },
+                  { key: 'SUSPENDED', label: 'Suspendidos', color: 'bg-red-500', count: rh.statusDistribution.SUSPENDED || 0 },
+                  { key: 'CANCELLED', label: 'Cancelados', color: 'bg-gray-500', count: rh.statusDistribution.CANCELLED || 0 },
+                ];
+                return html`<div className="space-y-4">
+                  <div className="flex rounded-full overflow-hidden h-5" style=${{ background: 'rgba(255,255,255,0.06)' }}>
+                    ${statuses.filter(function(s) { return s.count > 0; }).map(function(s) {
+                      return html`<div key=${s.key} className=${s.color + ' transition-all duration-500'} style=${{ width: (total > 0 ? Math.max(s.count / total * 100, 2) : 0) + '%' }} title=${s.label + ': ' + s.count} />`;
+                    })}
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    ${statuses.map(function(s) {
+                      return html`<div key=${s.key} className="flex items-center gap-2 text-sm">
+                        <div className=${s.color + ' w-2.5 h-2.5 rounded-full flex-shrink-0'} />
+                        <span className="text-gray-400">${s.label}</span>
+                        <span className="text-white font-bold ml-auto">${s.count}</span>
+                      </div>`;
+                    })}
+                  </div>
+                  <div className="border-t border-white/[0.06] pt-4 space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-400">Retencion de referidos</span>
+                      <span className=${'font-bold ' + (rh.referredRetentionRate >= 70 ? 'text-emerald-400' : rh.referredRetentionRate >= 40 ? 'text-yellow-400' : 'text-red-400')}>${rh.referredRetentionRate}%</span>
+                    </div>
+                    <div className="h-2 rounded-full overflow-hidden" style=${{ background: 'rgba(255,255,255,0.06)' }}>
+                      <div className=${'h-full rounded-full transition-all duration-500 ' + (rh.referredRetentionRate >= 70 ? 'bg-emerald-500' : rh.referredRetentionRate >= 40 ? 'bg-yellow-500' : 'bg-red-500')} style=${{ width: rh.referredRetentionRate + '%' }} />
+                    </div>
+                    <p className="text-xs text-gray-500">${rh.referredActive} de ${rh.referredTotal} restaurantes referidos siguen activos · ${rh.directCount} registro${'s' } directo${'s'}</p>
+                  </div>
+                </div>`;
+              }()}
+            </${SpotlightCard}>`}
+
+            ${analytics.userGrowth && analytics.userGrowth.length > 0 && html`<${SpotlightCard}>
+              <div className="flex items-center gap-2 mb-4">
+                <svg className="h-5 w-5 text-ocean-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                <h3 className="text-lg font-semibold text-white">Crecimiento de Usuarios</h3>
+                <span className="ml-auto text-sm text-gray-400">${analytics.totals.users} total</span>
+              </div>
+              ${function() {
+                var data = analytics.userGrowth;
+                var maxVal = 0;
+                data.forEach(function(d) { if (d.count > maxVal) maxVal = d.count; });
+                var monthNames = { '01': 'Ene', '02': 'Feb', '03': 'Mar', '04': 'Abr', '05': 'May', '06': 'Jun', '07': 'Jul', '08': 'Ago', '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dic' };
+                return html`<div className="flex items-end gap-2 justify-center" style=${{ height: '140px' }}>
+                  ${data.map(function(d) {
+                    var h = maxVal > 0 ? Math.max(Math.round((d.count / maxVal) * 120), 8) : 8;
+                    var parts = d.month.split('-');
+                    var label = (monthNames[parts[1]] || parts[1]) + ' ' + parts[0].slice(2);
+                    return html`<div key=${d.month} className="flex flex-col items-center gap-1 flex-1" style=${{ maxWidth: '60px' }}>
+                      <span className="text-xs text-gray-400 font-bold">${d.count}</span>
+                      <div className="w-full rounded-t-md bg-gradient-to-t from-ocean-600 to-ocean-400 transition-all duration-500" style=${{ height: h + 'px' }} />
+                      <span className="text-[10px] text-gray-500">${label}</span>
+                    </div>`;
+                  })}
+                </div>`;
+              }()}
+            </${SpotlightCard}>`}
+          </div>
+
+          ${analytics.rewardBreakdown && analytics.rewardBreakdown.length > 0 && html`<${SpotlightCard}>
+            <div className="flex items-center gap-2 mb-4">
+              <svg className="h-5 w-5 text-justo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"/></svg>
+              <h3 className="text-lg font-semibold text-white">Distribucion de Recompensas por Tipo</h3>
+            </div>
+            <div className="space-y-3">
+              ${function() {
+                var rb = analytics.rewardBreakdown;
+                var maxCount = 0;
+                rb.forEach(function(r) { if (r.count > maxCount) maxCount = r.count; });
+                var typeColors = { CREDITS: 'bg-emerald-500', DISCOUNT: 'bg-orange-500', FEE_WAIVER: 'bg-cyan-500', CUSTOM: 'bg-pink-500' };
+                var typeLabels = { CREDITS: 'Creditos', DISCOUNT: 'Descuentos', FEE_WAIVER: 'Exencion Comision', CUSTOM: 'Personalizado' };
+                return rb.map(function(r) {
+                  var pct = maxCount > 0 ? Math.round((r.count / maxCount) * 100) : 0;
+                  return html`<div key=${r.type} className="flex items-center gap-3">
+                    <div className="w-32 sm:w-40 text-right shrink-0">
+                      <span className="text-sm text-gray-300 font-medium">${typeLabels[r.type] || r.type}</span>
+                    </div>
+                    <div className="flex-1 h-6 rounded-md overflow-hidden" style=${{ background: 'rgba(255,255,255,0.06)' }}>
+                      <div className=${(typeColors[r.type] || 'bg-gray-500') + '/60 h-full rounded-md transition-all duration-500'} style=${{ width: pct + '%' }} />
+                    </div>
+                    <div className="w-12 text-right shrink-0"><span className="text-sm font-bold text-white">${r.count}</span></div>
+                    <div className="w-24 text-right shrink-0"><span className="text-xs text-gray-400">${r.totalAmount ? formatCLP(r.totalAmount) : '--'}</span></div>
+                  </div>`;
+                });
+              }()}
+            </div>
+          </${SpotlightCard}>`}
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <${SpotlightCard} style=${{ '--spotlight-color': 'rgba(124,58,237,0.10)' }}>
@@ -1589,7 +2054,7 @@
           </${SpotlightCard}>`}
         </${React.Fragment}>`}
 
-        <div>
+        ${activeTab === 'overview' && html`<div>
           <h3 className="text-lg font-semibold text-white mb-4">Gestion de Referidos</h3>
           <div className="flex items-center gap-3 flex-wrap mb-4">
             ${filters.map(function(f) {
@@ -1635,7 +2100,7 @@
                 </table></div>
                 <${Pagination} page=${page} total=${filtered.length} perPage=${perPage} onPageChange=${setPage} />`}
           </${SpotlightCard}>
-        </div>
+        </div>`}
       </div>`;
     }
 

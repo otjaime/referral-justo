@@ -19,4 +19,9 @@ export class AuthController {
     const result = await authService.registerWithReferral(req.body as RegisterWithReferralInput);
     res.status(201).json(result);
   }
+
+  async getAllUsers(_req: Request, res: Response) {
+    const users = await authService.getAllUsers();
+    res.json(users);
+  }
 }

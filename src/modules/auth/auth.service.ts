@@ -115,6 +115,27 @@ export class AuthService {
     };
   }
 
+  async getAllUsers() {
+    return prisma.user.findMany({
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        createdAt: true,
+        updatedAt: true,
+        _count: {
+          select: {
+            restaurants: true,
+            referralCodes: true,
+            rewards: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   private generateToken(userId: string, role: UserRole): string {
     return jwt.sign({ userId, role } satisfies JwtPayload, config.JWT_SECRET, {
       expiresIn: config.JWT_EXPIRES_IN,
