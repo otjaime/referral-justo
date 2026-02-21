@@ -159,6 +159,10 @@
     }
     .badge-earned { animation: badgeGlow 2.5s ease-in-out infinite; }
 
+    /* ─── Admin Nav: hide scrollbar ─── */
+    .admin-nav::-webkit-scrollbar { display: none; }
+    .admin-nav { -ms-overflow-style: none; scrollbar-width: none; }
+
     /* ─── Noise Texture (inline SVG) ─── */
     .noise { position: relative; }
     .noise::before {
@@ -1359,134 +1363,23 @@
       </div>`;
     }
 
-    function AdminPanel() {
-      var toast = useToast();
-      var _r = useState([]), referrals = _r[0], setReferrals = _r[1];
-      var _a = useState(null), analytics = _a[0], setAnalytics = _a[1];
-      var _l = useState(true), loading = _l[0], setLoading = _l[1];
-      var _f = useState('ALL'), filter = _f[0], setFilter = _f[1];
-      var _q = useState(null), qualifyingId = _q[0], setQualifyingId = _q[1];
-      var _search = useState(''), search = _search[0], setSearch = _search[1];
-      var _page = useState(1), page = _page[0], setPage = _page[1];
-      var _tab = useState('overview'), activeTab = _tab[0], setActiveTab = _tab[1];
-      var _users = useState([]), users = _users[0], setUsers = _users[1];
-      var _rests = useState([]), adminRestaurants = _rests[0], setAdminRestaurants = _rests[1];
-      var _allRw = useState([]), allRewards = _allRw[0], setAllRewards = _allRw[1];
+    function AdminOverviewScreen(props) {
+      var analytics = props.data.analytics;
+      var referrals = props.data.referrals;
+      if (!analytics) return null;
 
-      useEffect(function() {
-        Promise.all([
-          api('/referrals/admin/all'),
-          api('/analytics/dashboard'),
-          api('/auth/admin/users'),
-          api('/restaurants/admin/all'),
-          api('/rewards/admin/all'),
-        ])
-          .then(function(res) {
-            setReferrals(res[0]);
-            setAnalytics(res[1]);
-            setUsers(res[2]);
-            setAdminRestaurants(res[3]);
-            setAllRewards(res[4]);
-          })
-          .catch(function(err) { toast.addToast('Error al cargar panel admin', 'error'); })
-          .finally(function() { setLoading(false); });
-      }, []);
-
-      function qualify(id) {
-        setQualifyingId(id);
-        api('/referrals/' + id + '/qualify', { method: 'POST' })
-          .then(function() {
-            setReferrals(function(prev) { return prev.map(function(r) { return r.id === id ? Object.assign({}, r, { status: 'QUALIFIED' }) : r; }); });
-            toast.addToast('Referido calificado!');
-          })
-          .catch(function(err) { toast.addToast(err.message, 'error'); })
-          .finally(function() { setQualifyingId(null); });
-      }
-
-      if (loading) return html`<div className="space-y-6">
-        <div className="h-8 w-64 rounded shimmer" />
-        <${SkeletonGrid} cols=${3} />
-        <${SkeletonCard} rows=${4} />
-        <${SkeletonCard} rows=${5} />
-      </div>`;
-
-      var statusFiltered = filter === 'ALL' ? referrals : referrals.filter(function(r) { return r.status === filter; });
-      var filtered = search ? statusFiltered.filter(function(r) {
-        var ref = r.referralCode && r.referralCode.referrer;
-        var rest = r.referredRestaurant;
-        var q = search.toLowerCase();
-        return (ref && ref.name && ref.name.toLowerCase().indexOf(q) !== -1)
-          || (ref && ref.email && ref.email.toLowerCase().indexOf(q) !== -1)
-          || (rest && rest.name && rest.name.toLowerCase().indexOf(q) !== -1);
-      }) : statusFiltered;
-      var perPage = 10;
-      var paginatedReferrals = filtered.slice((page - 1) * perPage, page * perPage);
-      var filters = ['ALL', 'PENDING', 'QUALIFIED', 'REWARDED', 'EXPIRED'];
-      var filterLabels = { ALL: 'Todos', PENDING: 'Pendientes', QUALIFIED: 'Calificados', REWARDED: 'Recompensados', EXPIRED: 'Expirados' };
-
-      // Reward type breakdown (client-side from referral data)
-      var creditTotal = 0, discountTotal = 0;
-      referrals.forEach(function(ref) {
-        (ref.rewards || []).forEach(function(rw) {
-          if (rw.rewardType === 'CREDITS' && rw.amount) creditTotal += rw.amount;
-          if (rw.rewardType === 'DISCOUNT' && rw.amount) discountTotal += rw.amount;
-        });
-      });
-
-      // Funnel widths
-      var fTotal = analytics ? analytics.funnel.total : 0;
-      var fQualPlus = analytics ? (analytics.funnel.qualified + analytics.funnel.rewarded) : 0;
-      var fRewarded = analytics ? analytics.funnel.rewarded : 0;
+      var fTotal = analytics.funnel.total;
+      var fQualPlus = analytics.funnel.qualified + analytics.funnel.rewarded;
+      var fRewarded = analytics.funnel.rewarded;
       var widthQual = fTotal > 0 ? Math.round((fQualPlus / fTotal) * 100) : 0;
       var widthRew = fTotal > 0 ? Math.round((fRewarded / fTotal) * 100) : 0;
       var dropoff1 = fTotal > 0 ? Math.round(((fTotal - fQualPlus) / fTotal) * 100) : 0;
       var dropoff2 = fQualPlus > 0 ? Math.round(((fQualPlus - fRewarded) / fQualPlus) * 100) : 0;
-
-      // Redeem progress
-      var redeemPct = analytics && analytics.rewardEconomics.totalIssuedAmount > 0
-        ? Math.round((analytics.rewardEconomics.totalRedeemedAmount / analytics.rewardEconomics.totalIssuedAmount) * 100) : 0;
-
-      // Conversion rate color
-      var convRate = analytics ? analytics.funnel.conversionRate : 0;
+      var convRate = analytics.funnel.conversionRate;
       var convColor = convRate >= 50 ? 'border-l-green-500' : convRate >= 25 ? 'border-l-yellow-500' : 'border-l-red-500';
 
-      // Timeline chart data
-      var timelineData = analytics ? analytics.timeline || [] : [];
-      var timelineMax = 0;
-      timelineData.forEach(function(t) { if (t.total > timelineMax) timelineMax = t.total; });
-      var monthNames = { '01': 'Ene', '02': 'Feb', '03': 'Mar', '04': 'Abr', '05': 'May', '06': 'Jun', '07': 'Jul', '08': 'Ago', '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dic' };
-
-      return html`<div className="space-y-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gradient">Panel de Administracion</h2>
-          <p className="text-sm text-gray-500 mt-1">Metricas y gestion del programa de referidos</p>
-        </div>
-
-        <div className="flex rounded-xl p-1 gap-1" style=${{ background: 'rgba(255,255,255,0.06)' }}>
-          ${[
-            { id: 'overview', label: 'Resumen', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
-            { id: 'users', label: 'Usuarios (' + users.length + ')', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197' },
-            { id: 'restaurants', label: 'Restaurantes (' + adminRestaurants.length + ')', icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
-            { id: 'rewards', label: 'Recompensas (' + allRewards.length + ')', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1' },
-          ].map(function(tab) {
-            return html`<button key=${tab.id} onClick=${function() { setActiveTab(tab.id); }}
-              className=${'flex-1 py-2.5 px-3 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-2 ' +
-                (activeTab === tab.id ? 'bg-white/10 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5')}>
-              <svg className="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d=${tab.icon}/>
-              </svg>
-              <span className="hidden sm:inline">${tab.label}</span>
-            </button>`;
-          })}
-        </div>
-
-        ${activeTab === 'users' && html`<${AdminUsersTab} users=${users} />`}
-        ${activeTab === 'restaurants' && html`<${AdminRestaurantsTab} restaurants=${adminRestaurants} />`}
-        ${activeTab === 'rewards' && html`<${AdminRewardsTab} rewards=${allRewards} />`}
-
-        ${activeTab === 'overview' && analytics && html`<${React.Fragment}>
-
-          ${analytics.channelScore && html`<div className="relative overflow-hidden bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-2xl shadow-2xl p-6 border border-white/[0.08]">
+      return html`<${React.Fragment}>
+        ${analytics.channelScore && html`<div className="relative overflow-hidden bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-2xl shadow-2xl p-6 border border-white/[0.08]">
             <div className="absolute inset-0 opacity-20" style=${{ background: 'radial-gradient(circle at 15% 50%, ' + (analytics.channelScore.score >= 70 ? 'rgba(16,185,129,0.4)' : analytics.channelScore.score >= 40 ? 'rgba(234,179,8,0.4)' : 'rgba(239,68,68,0.4)') + ' 0%, transparent 60%)' }} />
             <div className="relative flex flex-col sm:flex-row gap-6 items-center sm:items-start">
               <div className="flex flex-col items-center gap-1 min-w-[120px]">
@@ -1541,21 +1434,96 @@
             </div>
           </div>`}
 
-          <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-justo-900 rounded-2xl shadow-xl p-6 text-white">
-            <div className="flex items-center gap-2 mb-6">
-              <svg className="h-5 w-5 text-justo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-              <h3 className="text-lg font-semibold">Inteligencia de Crecimiento</h3>
-            </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <${SpotlightCard} style=${{ '--spotlight-color': 'rgba(124,58,237,0.10)' }}>
+              <p className="text-sm text-gray-400 font-medium">Total Referidos</p>
+              <p className="text-3xl font-bold text-white mt-1"><${AnimatedCounter} value=${analytics.funnel.total} /></p>
+              <p className="text-xs text-gray-500 mt-2">${analytics.funnel.pending} pendientes, ${analytics.funnel.qualified} calificados</p>
+            </${SpotlightCard}>
+            <${SpotlightCard} style=${{ '--spotlight-color': convRate >= 50 ? 'rgba(16,185,129,0.10)' : convRate >= 25 ? 'rgba(234,179,8,0.10)' : 'rgba(239,68,68,0.10)' }}>
+              <p className="text-sm text-gray-400 font-medium">Tasa de Conversion</p>
+              <p className="text-3xl font-bold text-white mt-1"><${AnimatedCounter} value=${analytics.funnel.conversionRate} />%</p>
+              <p className="text-xs text-gray-500 mt-2">Calificados + Recompensados / Total</p>
+            </${SpotlightCard}>
+            <${SpotlightCard} style=${{ '--spotlight-color': 'rgba(59,130,246,0.10)' }}>
+              <p className="text-sm text-gray-400 font-medium">Restaurantes Activos</p>
+              <p className="text-3xl font-bold text-white mt-1"><${AnimatedCounter} value=${analytics.totals.restaurants} /></p>
+              <p className="text-xs text-gray-500 mt-2">${analytics.totals.users} usuarios registrados</p>
+            </${SpotlightCard}>
+          </div>
 
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-              ${function() {
-                var gm = analytics.growthMetrics;
-                var k = gm.kFactor.allTime;
-                var kColor = k >= 1 ? 'from-green-500/20 to-green-600/10 border-green-500/30' : k >= 0.5 ? 'from-yellow-500/20 to-yellow-600/10 border-yellow-500/30' : 'from-red-500/20 to-red-600/10 border-red-500/30';
-                var kLabel = k >= 1 ? 'Crecimiento viral' : k >= 0.5 ? 'Pre-viral' : 'Sub-viral';
-                var kTextColor = k >= 1 ? 'text-green-400' : k >= 0.5 ? 'text-yellow-400' : 'text-red-400';
-                var vel = gm.velocity;
-                var trendColor = vel.trend >= 0 ? 'text-green-400' : 'text-red-400';
+          <${SpotlightCard}>
+            <h3 className="text-lg font-semibold text-white mb-6">Embudo de Conversion</h3>
+            <div className="space-y-1">
+              <div className="flex items-center gap-3">
+                <div className="w-24 text-right"><span className="text-xs font-medium text-gray-400">Total</span></div>
+                <div className="flex-1"><div className="relative h-10 rounded-lg overflow-hidden" style=${{ background: 'rgba(255,255,255,0.06)' }}>
+                  <div className="h-full rounded-lg bg-yellow-500/40" style=${{ width: '100%' }} />
+                  <div className="absolute inset-0 flex items-center justify-center"><span className="text-sm font-bold text-white">${analytics.funnel.pending + analytics.funnel.qualified + analytics.funnel.rewarded}</span></div>
+                </div></div>
+                <div className="w-12 text-right"><span className="text-xs text-gray-500">100%</span></div>
+              </div>
+              <div className="flex items-center gap-3 ml-24 pl-3">
+                <svg className="h-4 w-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
+                <span className="text-xs text-red-400">${dropoff1 > 0 ? '-' + dropoff1 + '% abandono' : 'Sin abandono'}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-24 text-right"><span className="text-xs font-medium text-gray-400">Calificados</span></div>
+                <div className="flex-1"><div className="relative h-10 rounded-lg overflow-hidden" style=${{ background: 'rgba(255,255,255,0.06)' }}>
+                  <div className="h-full rounded-lg bg-blue-500/40 transition-all duration-500" style=${{ width: widthQual + '%' }} />
+                  <div className="absolute inset-0 flex items-center justify-center"><span className="text-sm font-bold text-white">${fQualPlus}</span></div>
+                </div></div>
+                <div className="w-12 text-right"><span className="text-xs text-gray-500">${widthQual}%</span></div>
+              </div>
+              <div className="flex items-center gap-3 ml-24 pl-3">
+                <svg className="h-4 w-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
+                <span className="text-xs text-red-400">${dropoff2 > 0 ? '-' + dropoff2 + '% pendiente' : 'Todos recompensados'}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-24 text-right"><span className="text-xs font-medium text-gray-400">Recompensados</span></div>
+                <div className="flex-1"><div className="relative h-10 rounded-lg overflow-hidden" style=${{ background: 'rgba(255,255,255,0.06)' }}>
+                  <div className="h-full rounded-lg bg-emerald-500/40 transition-all duration-500" style=${{ width: widthRew + '%' }} />
+                  <div className="absolute inset-0 flex items-center justify-center"><span className="text-sm font-bold text-white">${fRewarded}</span></div>
+                </div></div>
+                <div className="w-12 text-right"><span className="text-xs text-gray-500">${widthRew}%</span></div>
+              </div>
+            </div>
+            <div className="mt-4 pt-4 border-t border-white/[0.06] flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="h-6 rounded bg-white/10 flex items-center justify-center px-3"><span className="text-xs font-medium text-gray-400">${analytics.funnel.expired}</span></div>
+                <span className="text-xs text-gray-500">Expirados</span>
+              </div>
+              <span className="text-xs text-gray-500">Tiempo promedio: ${analytics.avgTimeToQualifyDays} dias</span>
+            </div>
+          </${SpotlightCard}>
+      </${React.Fragment}>`;
+    }
+
+    function AdminAnalyticsScreen(props) {
+      var analytics = props.data.analytics;
+      if (!analytics) return null;
+
+      var monthNames = { '01': 'Ene', '02': 'Feb', '03': 'Mar', '04': 'Abr', '05': 'May', '06': 'Jun', '07': 'Jul', '08': 'Ago', '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dic' };
+      var timelineData = analytics.timeline || [];
+      var timelineMax = 0;
+      timelineData.forEach(function(t) { if (t.total > timelineMax) timelineMax = t.total; });
+
+      return html`<${React.Fragment}>
+        <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-justo-900 rounded-2xl shadow-xl p-6 text-white">
+          <div className="flex items-center gap-2 mb-6">
+            <svg className="h-5 w-5 text-justo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+            <h3 className="text-lg font-semibold">Inteligencia de Crecimiento</h3>
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            ${function() {
+              var gm = analytics.growthMetrics;
+              var k = gm.kFactor.allTime;
+              var kColor = k >= 1 ? 'from-green-500/20 to-green-600/10 border-green-500/30' : k >= 0.5 ? 'from-yellow-500/20 to-yellow-600/10 border-yellow-500/30' : 'from-red-500/20 to-red-600/10 border-red-500/30';
+              var kLabel = k >= 1 ? 'Crecimiento viral' : k >= 0.5 ? 'Pre-viral' : 'Sub-viral';
+              var kTextColor = k >= 1 ? 'text-green-400' : k >= 0.5 ? 'text-yellow-400' : 'text-red-400';
+              var vel = gm.velocity;
+              var trendColor = vel.trend >= 0 ? 'text-green-400' : 'text-red-400';
                 var trendArrow = vel.trend >= 0 ? 'M5 10l7-7m0 0l7 7m-7-7v18' : 'M19 14l-7 7m0 0l-7-7m7 7V3';
                 return html`<${React.Fragment}>
                   <div className=${'bg-gradient-to-br border rounded-xl p-4 ' + kColor}>
@@ -1736,124 +1704,6 @@
             }()}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            ${analytics.restaurantHealth && html`<${SpotlightCard}>
-              <div className="flex items-center gap-2 mb-4">
-                <svg className="h-5 w-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-                <h3 className="text-lg font-semibold text-white">Salud de Restaurantes</h3>
-              </div>
-              ${function() {
-                var rh = analytics.restaurantHealth;
-                var total = analytics.totals.restaurants;
-                var statuses = [
-                  { key: 'ACTIVE', label: 'Activos', color: 'bg-emerald-500', count: rh.statusDistribution.ACTIVE || 0 },
-                  { key: 'PENDING', label: 'Pendientes', color: 'bg-yellow-500', count: rh.statusDistribution.PENDING || 0 },
-                  { key: 'SUSPENDED', label: 'Suspendidos', color: 'bg-red-500', count: rh.statusDistribution.SUSPENDED || 0 },
-                  { key: 'CANCELLED', label: 'Cancelados', color: 'bg-gray-500', count: rh.statusDistribution.CANCELLED || 0 },
-                ];
-                return html`<div className="space-y-4">
-                  <div className="flex rounded-full overflow-hidden h-5" style=${{ background: 'rgba(255,255,255,0.06)' }}>
-                    ${statuses.filter(function(s) { return s.count > 0; }).map(function(s) {
-                      return html`<div key=${s.key} className=${s.color + ' transition-all duration-500'} style=${{ width: (total > 0 ? Math.max(s.count / total * 100, 2) : 0) + '%' }} title=${s.label + ': ' + s.count} />`;
-                    })}
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    ${statuses.map(function(s) {
-                      return html`<div key=${s.key} className="flex items-center gap-2 text-sm">
-                        <div className=${s.color + ' w-2.5 h-2.5 rounded-full flex-shrink-0'} />
-                        <span className="text-gray-400">${s.label}</span>
-                        <span className="text-white font-bold ml-auto">${s.count}</span>
-                      </div>`;
-                    })}
-                  </div>
-                  <div className="border-t border-white/[0.06] pt-4 space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-400">Retencion de referidos</span>
-                      <span className=${'font-bold ' + (rh.referredRetentionRate >= 70 ? 'text-emerald-400' : rh.referredRetentionRate >= 40 ? 'text-yellow-400' : 'text-red-400')}>${rh.referredRetentionRate}%</span>
-                    </div>
-                    <div className="h-2 rounded-full overflow-hidden" style=${{ background: 'rgba(255,255,255,0.06)' }}>
-                      <div className=${'h-full rounded-full transition-all duration-500 ' + (rh.referredRetentionRate >= 70 ? 'bg-emerald-500' : rh.referredRetentionRate >= 40 ? 'bg-yellow-500' : 'bg-red-500')} style=${{ width: rh.referredRetentionRate + '%' }} />
-                    </div>
-                    <p className="text-xs text-gray-500">${rh.referredActive} de ${rh.referredTotal} restaurantes referidos siguen activos · ${rh.directCount} registro${'s' } directo${'s'}</p>
-                  </div>
-                </div>`;
-              }()}
-            </${SpotlightCard}>`}
-
-            ${analytics.userGrowth && analytics.userGrowth.length > 0 && html`<${SpotlightCard}>
-              <div className="flex items-center gap-2 mb-4">
-                <svg className="h-5 w-5 text-ocean-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                <h3 className="text-lg font-semibold text-white">Crecimiento de Usuarios</h3>
-                <span className="ml-auto text-sm text-gray-400">${analytics.totals.users} total</span>
-              </div>
-              ${function() {
-                var data = analytics.userGrowth;
-                var maxVal = 0;
-                data.forEach(function(d) { if (d.count > maxVal) maxVal = d.count; });
-                var monthNames = { '01': 'Ene', '02': 'Feb', '03': 'Mar', '04': 'Abr', '05': 'May', '06': 'Jun', '07': 'Jul', '08': 'Ago', '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dic' };
-                return html`<div className="flex items-end gap-2 justify-center" style=${{ height: '140px' }}>
-                  ${data.map(function(d) {
-                    var h = maxVal > 0 ? Math.max(Math.round((d.count / maxVal) * 120), 8) : 8;
-                    var parts = d.month.split('-');
-                    var label = (monthNames[parts[1]] || parts[1]) + ' ' + parts[0].slice(2);
-                    return html`<div key=${d.month} className="flex flex-col items-center gap-1 flex-1" style=${{ maxWidth: '60px' }}>
-                      <span className="text-xs text-gray-400 font-bold">${d.count}</span>
-                      <div className="w-full rounded-t-md bg-gradient-to-t from-ocean-600 to-ocean-400 transition-all duration-500" style=${{ height: h + 'px' }} />
-                      <span className="text-[10px] text-gray-500">${label}</span>
-                    </div>`;
-                  })}
-                </div>`;
-              }()}
-            </${SpotlightCard}>`}
-          </div>
-
-          ${analytics.rewardBreakdown && analytics.rewardBreakdown.length > 0 && html`<${SpotlightCard}>
-            <div className="flex items-center gap-2 mb-4">
-              <svg className="h-5 w-5 text-justo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"/></svg>
-              <h3 className="text-lg font-semibold text-white">Distribucion de Recompensas por Tipo</h3>
-            </div>
-            <div className="space-y-3">
-              ${function() {
-                var rb = analytics.rewardBreakdown;
-                var maxCount = 0;
-                rb.forEach(function(r) { if (r.count > maxCount) maxCount = r.count; });
-                var typeColors = { CREDITS: 'bg-emerald-500', DISCOUNT: 'bg-orange-500', FEE_WAIVER: 'bg-cyan-500', CUSTOM: 'bg-pink-500' };
-                var typeLabels = { CREDITS: 'Creditos', DISCOUNT: 'Descuentos', FEE_WAIVER: 'Exencion Comision', CUSTOM: 'Personalizado' };
-                return rb.map(function(r) {
-                  var pct = maxCount > 0 ? Math.round((r.count / maxCount) * 100) : 0;
-                  return html`<div key=${r.type} className="flex items-center gap-3">
-                    <div className="w-32 sm:w-40 text-right shrink-0">
-                      <span className="text-sm text-gray-300 font-medium">${typeLabels[r.type] || r.type}</span>
-                    </div>
-                    <div className="flex-1 h-6 rounded-md overflow-hidden" style=${{ background: 'rgba(255,255,255,0.06)' }}>
-                      <div className=${(typeColors[r.type] || 'bg-gray-500') + '/60 h-full rounded-md transition-all duration-500'} style=${{ width: pct + '%' }} />
-                    </div>
-                    <div className="w-12 text-right shrink-0"><span className="text-sm font-bold text-white">${r.count}</span></div>
-                    <div className="w-24 text-right shrink-0"><span className="text-xs text-gray-400">${r.totalAmount ? formatCLP(r.totalAmount) : '--'}</span></div>
-                  </div>`;
-                });
-              }()}
-            </div>
-          </${SpotlightCard}>`}
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <${SpotlightCard} style=${{ '--spotlight-color': 'rgba(124,58,237,0.10)' }}>
-              <p className="text-sm text-gray-400 font-medium">Total Referidos</p>
-              <p className="text-3xl font-bold text-white mt-1"><${AnimatedCounter} value=${analytics.funnel.total} /></p>
-              <p className="text-xs text-gray-500 mt-2">${analytics.funnel.pending} pendientes, ${analytics.funnel.qualified} calificados</p>
-            </${SpotlightCard}>
-            <${SpotlightCard} style=${{ '--spotlight-color': convRate >= 50 ? 'rgba(16,185,129,0.10)' : convRate >= 25 ? 'rgba(234,179,8,0.10)' : 'rgba(239,68,68,0.10)' }}>
-              <p className="text-sm text-gray-400 font-medium">Tasa de Conversion</p>
-              <p className="text-3xl font-bold text-white mt-1"><${AnimatedCounter} value=${analytics.funnel.conversionRate} />%</p>
-              <p className="text-xs text-gray-500 mt-2">Calificados + Recompensados / Total</p>
-            </${SpotlightCard}>
-            <${SpotlightCard} style=${{ '--spotlight-color': 'rgba(59,130,246,0.10)' }}>
-              <p className="text-sm text-gray-400 font-medium">Restaurantes Activos</p>
-              <p className="text-3xl font-bold text-white mt-1"><${AnimatedCounter} value=${analytics.totals.restaurants} /></p>
-              <p className="text-xs text-gray-500 mt-2">${analytics.totals.users} usuarios registrados</p>
-            </${SpotlightCard}>
-          </div>
-
           <${SpotlightCard}>
             <div className="flex items-center gap-2 mb-4">
               <svg className="h-5 w-5 text-justo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
@@ -1861,105 +1711,6 @@
             </div>
             <${NetworkTree} edges=${analytics.networkEdges} />
           </${SpotlightCard}>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <${SpotlightCard}>
-              <h3 className="text-lg font-semibold text-white mb-6">Embudo de Conversion</h3>
-              <div className="space-y-1">
-                <div className="flex items-center gap-3">
-                  <div className="w-24 text-right"><span className="text-xs font-medium text-gray-400">Total</span></div>
-                  <div className="flex-1"><div className="relative h-10 rounded-lg overflow-hidden" style=${{ background: 'rgba(255,255,255,0.06)' }}>
-                    <div className="h-full rounded-lg bg-yellow-500/40" style=${{ width: '100%' }} />
-                    <div className="absolute inset-0 flex items-center justify-center"><span className="text-sm font-bold text-white">${analytics.funnel.pending + analytics.funnel.qualified + analytics.funnel.rewarded}</span></div>
-                  </div></div>
-                  <div className="w-12 text-right"><span className="text-xs text-gray-500">100%</span></div>
-                </div>
-                <div className="flex items-center gap-3 ml-24 pl-3">
-                  <svg className="h-4 w-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
-                  <span className="text-xs text-red-400">${dropoff1 > 0 ? '-' + dropoff1 + '% abandono' : 'Sin abandono'}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-24 text-right"><span className="text-xs font-medium text-gray-400">Calificados</span></div>
-                  <div className="flex-1"><div className="relative h-10 rounded-lg overflow-hidden" style=${{ background: 'rgba(255,255,255,0.06)' }}>
-                    <div className="h-full rounded-lg bg-blue-500/40 transition-all duration-500" style=${{ width: widthQual + '%' }} />
-                    <div className="absolute inset-0 flex items-center justify-center"><span className="text-sm font-bold text-white">${fQualPlus}</span></div>
-                  </div></div>
-                  <div className="w-12 text-right"><span className="text-xs text-gray-500">${widthQual}%</span></div>
-                </div>
-                <div className="flex items-center gap-3 ml-24 pl-3">
-                  <svg className="h-4 w-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
-                  <span className="text-xs text-red-400">${dropoff2 > 0 ? '-' + dropoff2 + '% pendiente' : 'Todos recompensados'}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-24 text-right"><span className="text-xs font-medium text-gray-400">Recompensados</span></div>
-                  <div className="flex-1"><div className="relative h-10 rounded-lg overflow-hidden" style=${{ background: 'rgba(255,255,255,0.06)' }}>
-                    <div className="h-full rounded-lg bg-emerald-500/40 transition-all duration-500" style=${{ width: widthRew + '%' }} />
-                    <div className="absolute inset-0 flex items-center justify-center"><span className="text-sm font-bold text-white">${fRewarded}</span></div>
-                  </div></div>
-                  <div className="w-12 text-right"><span className="text-xs text-gray-500">${widthRew}%</span></div>
-                </div>
-              </div>
-              <div className="mt-4 pt-4 border-t border-white/[0.06] flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="h-6 rounded bg-white/10 flex items-center justify-center px-3"><span className="text-xs font-medium text-gray-400">${analytics.funnel.expired}</span></div>
-                  <span className="text-xs text-gray-500">Expirados</span>
-                </div>
-                <span className="text-xs text-gray-500">Tiempo promedio: ${analytics.avgTimeToQualifyDays} dias</span>
-              </div>
-            </${SpotlightCard}>
-
-            <${SpotlightCard}>
-              <h3 className="text-lg font-semibold text-white mb-4">Economia Unitaria</h3>
-              <div className="grid grid-cols-3 gap-3 mb-6">
-                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-center">
-                  <p className="text-xs text-red-400 font-medium">Costo por Lead</p>
-                  <p className="text-sm font-bold text-red-300">${formatCLP(analytics.unitEconomics.costPerQualified)}</p>
-                </div>
-                <div className="bg-justo-500/10 border border-justo-500/20 rounded-lg p-3 text-center">
-                  <p className="text-xs text-justo-400 font-medium">Gasto Total</p>
-                  <p className="text-sm font-bold text-justo-300">${formatCLP(analytics.unitEconomics.totalProgramSpend)}</p>
-                </div>
-                <div className="bg-ocean-500/10 border border-ocean-500/20 rounded-lg p-3 text-center">
-                  <p className="text-xs text-ocean-400 font-medium">Prom. x Referido</p>
-                  <p className="text-sm font-bold text-ocean-300">${formatCLP(analytics.unitEconomics.avgRewardPerReferral)}</p>
-                </div>
-              </div>
-              <div className="space-y-4">
-                <div>
-                  <div className="flex justify-between text-sm mb-2">
-                    <span className="text-gray-400">Total Emitido</span>
-                    <span className="font-bold text-white">${formatCLP(analytics.rewardEconomics.totalIssuedAmount)}</span>
-                  </div>
-                  <div className="h-4 rounded-full overflow-hidden" style=${{ background: 'rgba(255,255,255,0.06)' }}>
-                    <div className="h-full bg-gradient-to-r from-justo-500 to-ocean-500 rounded-full" style=${{ width: '100%' }} />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between text-sm mb-2">
-                    <span className="text-gray-400">Total Canjeado</span>
-                    <span className="font-bold text-emerald-400">${formatCLP(analytics.rewardEconomics.totalRedeemedAmount)}</span>
-                  </div>
-                  <div className="h-4 rounded-full overflow-hidden" style=${{ background: 'rgba(255,255,255,0.06)' }}>
-                    <div className="h-full bg-emerald-500/60 rounded-full transition-all duration-500" style=${{ width: redeemPct + '%' }} />
-                  </div>
-                  <div className="flex justify-between text-xs text-gray-500 mt-1">
-                    <span>${redeemPct}% del total emitido</span>
-                    <span>Ahorro potencial: ${formatCLP(analytics.rewardEconomics.totalIssuedAmount - analytics.rewardEconomics.totalRedeemedAmount)}</span>
-                  </div>
-                </div>
-              </div>
-              <div className="flex gap-3 mt-5">
-                <div className="flex-1 bg-justo-500/10 border border-justo-500/20 rounded-lg p-3 text-center">
-                  <p className="text-xs text-justo-400 font-medium">Creditos</p>
-                  <p className="text-sm font-bold text-justo-300">${formatCLP(creditTotal)}</p>
-                </div>
-                <div className="flex-1 bg-ocean-500/10 border border-ocean-500/20 rounded-lg p-3 text-center">
-                  <p className="text-xs text-ocean-400 font-medium">Descuentos</p>
-                  <p className="text-sm font-bold text-ocean-300">${formatCLP(discountTotal)}</p>
-                </div>
-              </div>
-            </${SpotlightCard}>
-          </div>
 
           ${timelineData.length > 0 && html`<${SpotlightCard}>
             <h3 className="text-lg font-semibold text-white mb-6">Crecimiento del Programa</h3>
@@ -1990,71 +1741,110 @@
               <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-emerald-500/50" /><span className="text-xs text-gray-500">Recompensados</span></div>
             </div>
           </${SpotlightCard}>`}
+      </${React.Fragment}>`;
+    }
 
-          ${analytics.topReferrers.length > 0 && html`<${SpotlightCard}>
-            <h3 className="text-lg font-semibold text-white mb-4">Top Referidores</h3>
-            <div className="overflow-x-auto"><table className="w-full">
-              <thead><tr className="border-b border-white/[0.06]">
-                <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase w-12">#</th>
-                <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase">Nombre</th>
-                <th className="text-center px-3 py-2 text-xs font-medium text-gray-500 uppercase">Enviados</th>
-                <th className="text-center px-3 py-2 text-xs font-medium text-gray-500 uppercase">Calificados</th>
-                <th className="text-center px-3 py-2 text-xs font-medium text-gray-500 uppercase">Conversion</th>
-                <th className="text-right px-3 py-2 text-xs font-medium text-gray-500 uppercase">Ganado</th>
-              </tr></thead>
-              <tbody>
-                ${analytics.topReferrers.map(function(r, i) {
-                  var convR = r.totalReferrals > 0 ? Math.round((r.qualifiedCount / r.totalReferrals) * 100) : 0;
-                  return html`<tr key=${r.id} className="border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02] transition-colors">
-                    <td className="px-3 py-3"><${RankBadge} position=${i + 1} /></td>
-                    <td className="px-3 py-3">
-                      <p className="text-sm font-medium text-white">${r.name}</p>
-                      <p className="text-xs text-gray-500">${r.email}</p>
-                    </td>
-                    <td className="px-3 py-3 text-center text-sm font-medium text-gray-300">${r.totalReferrals}</td>
-                    <td className="px-3 py-3 text-center text-sm font-bold text-emerald-400">${r.qualifiedCount}</td>
-                    <td className="px-3 py-3 text-center text-sm text-gray-400">${convR}%</td>
-                    <td className="px-3 py-3 text-right text-sm font-bold text-justo-400">${formatCLP(r.totalEarned)}</td>
-                  </tr>`;
-                })}
-              </tbody>
-            </table></div>
-          </${SpotlightCard}>`}
+    function AdminReferralsScreen(props) {
+      var toast = useToast();
+      var analytics = props.data.analytics;
+      var referrals = props.data.referrals;
+      var setReferrals = props.data.setReferrals;
+      if (!analytics) return null;
 
-          ${analytics.codePerformance && analytics.codePerformance.length > 0 && html`<${SpotlightCard}>
-            <h3 className="text-lg font-semibold text-white mb-4">Rendimiento por Codigo</h3>
-            <div className="overflow-x-auto"><table className="w-full">
-              <thead><tr className="border-b border-white/[0.06]">
-                <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase">Codigo</th>
-                <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase">Referidor</th>
-                <th className="text-center px-3 py-2 text-xs font-medium text-gray-500 uppercase">Enviados</th>
-                <th className="text-center px-3 py-2 text-xs font-medium text-gray-500 uppercase">Calificados</th>
-                <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase w-40">Conversion</th>
-              </tr></thead>
-              <tbody>
-                ${analytics.codePerformance.map(function(cp) {
-                  var barColor = cp.conversionRate > 50 ? 'bg-emerald-500/60' : cp.conversionRate >= 25 ? 'bg-yellow-500/60' : 'bg-red-500/60';
-                  return html`<tr key=${cp.code} className="border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02] transition-colors">
-                    <td className="px-3 py-3 font-mono text-sm text-justo-400 font-medium">${cp.code}</td>
-                    <td className="px-3 py-3 text-sm text-gray-300">${cp.referrerName}</td>
-                    <td className="px-3 py-3 text-center text-sm font-medium text-gray-300">${cp.totalReferrals}</td>
-                    <td className="px-3 py-3 text-center text-sm font-bold text-emerald-400">${cp.qualifiedCount}</td>
-                    <td className="px-3 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 h-2.5 rounded-full overflow-hidden" style=${{ background: 'rgba(255,255,255,0.06)' }}>
-                          <div className=${'h-full rounded-full ' + barColor} style=${{ width: cp.conversionRate + '%' }} />
-                        </div>
-                        <span className="text-xs font-medium text-gray-400 w-8 text-right">${cp.conversionRate}%</span>
+      var _f = useState('ALL'), filter = _f[0], setFilter = _f[1];
+      var _q = useState(null), qualifyingId = _q[0], setQualifyingId = _q[1];
+      var _search = useState(''), search = _search[0], setSearch = _search[1];
+      var _page = useState(1), page = _page[0], setPage = _page[1];
+
+      function qualify(id) {
+        setQualifyingId(id);
+        api('/referrals/' + id + '/qualify', { method: 'POST' })
+          .then(function() {
+            setReferrals(function(prev) { return prev.map(function(r) { return r.id === id ? Object.assign({}, r, { status: 'QUALIFIED' }) : r; }); });
+            toast.addToast('Referido calificado!');
+          })
+          .catch(function(err) { toast.addToast(err.message, 'error'); })
+          .finally(function() { setQualifyingId(null); });
+      }
+
+      var statusFiltered = filter === 'ALL' ? referrals : referrals.filter(function(r) { return r.status === filter; });
+      var filtered = search ? statusFiltered.filter(function(r) {
+        var ref = r.referralCode && r.referralCode.referrer;
+        var rest = r.referredRestaurant;
+        var q = search.toLowerCase();
+        return (ref && ref.name && ref.name.toLowerCase().indexOf(q) !== -1)
+          || (ref && ref.email && ref.email.toLowerCase().indexOf(q) !== -1)
+          || (rest && rest.name && rest.name.toLowerCase().indexOf(q) !== -1);
+      }) : statusFiltered;
+      var perPage = 10;
+      var paginatedReferrals = filtered.slice((page - 1) * perPage, page * perPage);
+      var filters = ['ALL', 'PENDING', 'QUALIFIED', 'REWARDED', 'EXPIRED'];
+      var filterLabels = { ALL: 'Todos', PENDING: 'Pendientes', QUALIFIED: 'Calificados', REWARDED: 'Recompensados', EXPIRED: 'Expirados' };
+
+      return html`<${React.Fragment}>
+        ${analytics.topReferrers.length > 0 && html`<${SpotlightCard}>
+          <h3 className="text-lg font-semibold text-white mb-4">Top Referidores</h3>
+          <div className="overflow-x-auto"><table className="w-full">
+            <thead><tr className="border-b border-white/[0.06]">
+              <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase w-12">#</th>
+              <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase">Nombre</th>
+              <th className="text-center px-3 py-2 text-xs font-medium text-gray-500 uppercase">Enviados</th>
+              <th className="text-center px-3 py-2 text-xs font-medium text-gray-500 uppercase">Calificados</th>
+              <th className="text-center px-3 py-2 text-xs font-medium text-gray-500 uppercase">Conversion</th>
+              <th className="text-right px-3 py-2 text-xs font-medium text-gray-500 uppercase">Ganado</th>
+            </tr></thead>
+            <tbody>
+              ${analytics.topReferrers.map(function(r, i) {
+                var convR = r.totalReferrals > 0 ? Math.round((r.qualifiedCount / r.totalReferrals) * 100) : 0;
+                return html`<tr key=${r.id} className="border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02] transition-colors">
+                  <td className="px-3 py-3"><${RankBadge} position=${i + 1} /></td>
+                  <td className="px-3 py-3">
+                    <p className="text-sm font-medium text-white">${r.name}</p>
+                    <p className="text-xs text-gray-500">${r.email}</p>
+                  </td>
+                  <td className="px-3 py-3 text-center text-sm font-medium text-gray-300">${r.totalReferrals}</td>
+                  <td className="px-3 py-3 text-center text-sm font-bold text-emerald-400">${r.qualifiedCount}</td>
+                  <td className="px-3 py-3 text-center text-sm text-gray-400">${convR}%</td>
+                  <td className="px-3 py-3 text-right text-sm font-bold text-justo-400">${formatCLP(r.totalEarned)}</td>
+                </tr>`;
+              })}
+            </tbody>
+          </table></div>
+        </${SpotlightCard}>`}
+
+        ${analytics.codePerformance && analytics.codePerformance.length > 0 && html`<${SpotlightCard}>
+          <h3 className="text-lg font-semibold text-white mb-4">Rendimiento por Codigo</h3>
+          <div className="overflow-x-auto"><table className="w-full">
+            <thead><tr className="border-b border-white/[0.06]">
+              <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase">Codigo</th>
+              <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase">Referidor</th>
+              <th className="text-center px-3 py-2 text-xs font-medium text-gray-500 uppercase">Enviados</th>
+              <th className="text-center px-3 py-2 text-xs font-medium text-gray-500 uppercase">Calificados</th>
+              <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase w-40">Conversion</th>
+            </tr></thead>
+            <tbody>
+              ${analytics.codePerformance.map(function(cp) {
+                var barColor = cp.conversionRate > 50 ? 'bg-emerald-500/60' : cp.conversionRate >= 25 ? 'bg-yellow-500/60' : 'bg-red-500/60';
+                return html`<tr key=${cp.code} className="border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02] transition-colors">
+                  <td className="px-3 py-3 font-mono text-sm text-justo-400 font-medium">${cp.code}</td>
+                  <td className="px-3 py-3 text-sm text-gray-300">${cp.referrerName}</td>
+                  <td className="px-3 py-3 text-center text-sm font-medium text-gray-300">${cp.totalReferrals}</td>
+                  <td className="px-3 py-3 text-center text-sm font-bold text-emerald-400">${cp.qualifiedCount}</td>
+                  <td className="px-3 py-3">
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-2.5 rounded-full overflow-hidden" style=${{ background: 'rgba(255,255,255,0.06)' }}>
+                        <div className=${'h-full rounded-full ' + barColor} style=${{ width: cp.conversionRate + '%' }} />
                       </div>
-                    </td>
-                  </tr>`;
-                })}
-              </tbody>
-            </table></div>
-          </${SpotlightCard}>`}
-        </${React.Fragment}>`}
+                      <span className="text-xs font-medium text-gray-400 w-8 text-right">${cp.conversionRate}%</span>
+                    </div>
+                  </td>
+                </tr>`;
+              })}
+            </tbody>
+          </table></div>
+        </${SpotlightCard}>`}
 
-        ${activeTab === 'overview' && html`<div>
+        <div>
           <h3 className="text-lg font-semibold text-white mb-4">Gestion de Referidos</h3>
           <div className="flex items-center gap-3 flex-wrap mb-4">
             ${filters.map(function(f) {
@@ -2100,7 +1890,287 @@
                 </table></div>
                 <${Pagination} page=${page} total=${filtered.length} perPage=${perPage} onPageChange=${setPage} />`}
           </${SpotlightCard}>
-        </div>`}
+        </div>
+      </${React.Fragment}>`;
+    }
+
+    function AdminRestaurantsScreen(props) {
+      var analytics = props.data.analytics;
+      var adminRestaurants = props.data.adminRestaurants;
+      if (!analytics) return null;
+
+      return html`<${React.Fragment}>
+        ${analytics.restaurantHealth && html`<${SpotlightCard}>
+          <div className="flex items-center gap-2 mb-4">
+            <svg className="h-5 w-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+            <h3 className="text-lg font-semibold text-white">Salud de Restaurantes</h3>
+          </div>
+          ${function() {
+            var rh = analytics.restaurantHealth;
+            var total = analytics.totals.restaurants;
+            var statuses = [
+              { key: 'ACTIVE', label: 'Activos', color: 'bg-emerald-500', count: rh.statusDistribution.ACTIVE || 0 },
+              { key: 'PENDING', label: 'Pendientes', color: 'bg-yellow-500', count: rh.statusDistribution.PENDING || 0 },
+              { key: 'SUSPENDED', label: 'Suspendidos', color: 'bg-red-500', count: rh.statusDistribution.SUSPENDED || 0 },
+              { key: 'CANCELLED', label: 'Cancelados', color: 'bg-gray-500', count: rh.statusDistribution.CANCELLED || 0 },
+            ];
+            return html`<div className="space-y-4">
+              <div className="flex rounded-full overflow-hidden h-5" style=${{ background: 'rgba(255,255,255,0.06)' }}>
+                ${statuses.filter(function(s) { return s.count > 0; }).map(function(s) {
+                  return html`<div key=${s.key} className=${s.color + ' transition-all duration-500'} style=${{ width: (total > 0 ? Math.max(s.count / total * 100, 2) : 0) + '%' }} title=${s.label + ': ' + s.count} />`;
+                })}
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                ${statuses.map(function(s) {
+                  return html`<div key=${s.key} className="flex items-center gap-2 text-sm">
+                    <div className=${s.color + ' w-2.5 h-2.5 rounded-full flex-shrink-0'} />
+                    <span className="text-gray-400">${s.label}</span>
+                    <span className="text-white font-bold ml-auto">${s.count}</span>
+                  </div>`;
+                })}
+              </div>
+              <div className="border-t border-white/[0.06] pt-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Retencion de referidos</span>
+                  <span className=${'font-bold ' + (rh.referredRetentionRate >= 70 ? 'text-emerald-400' : rh.referredRetentionRate >= 40 ? 'text-yellow-400' : 'text-red-400')}>${rh.referredRetentionRate}%</span>
+                </div>
+                <div className="h-2 rounded-full overflow-hidden" style=${{ background: 'rgba(255,255,255,0.06)' }}>
+                  <div className=${'h-full rounded-full transition-all duration-500 ' + (rh.referredRetentionRate >= 70 ? 'bg-emerald-500' : rh.referredRetentionRate >= 40 ? 'bg-yellow-500' : 'bg-red-500')} style=${{ width: rh.referredRetentionRate + '%' }} />
+                </div>
+                <p className="text-xs text-gray-500">${rh.referredActive} de ${rh.referredTotal} restaurantes referidos siguen activos · ${rh.directCount} registro${'s' } directo${'s'}</p>
+              </div>
+            </div>`;
+          }()}
+        </${SpotlightCard}>`}
+        <${AdminRestaurantsTab} restaurants=${adminRestaurants} />
+      </${React.Fragment}>`;
+    }
+
+    function AdminUsersScreen(props) {
+      var analytics = props.data.analytics;
+      var users = props.data.users;
+      if (!analytics) return null;
+
+      var monthNames = { '01': 'Ene', '02': 'Feb', '03': 'Mar', '04': 'Abr', '05': 'May', '06': 'Jun', '07': 'Jul', '08': 'Ago', '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dic' };
+
+      return html`<${React.Fragment}>
+        ${analytics.userGrowth && analytics.userGrowth.length > 0 && html`<${SpotlightCard}>
+          <div className="flex items-center gap-2 mb-4">
+            <svg className="h-5 w-5 text-ocean-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            <h3 className="text-lg font-semibold text-white">Crecimiento de Usuarios</h3>
+            <span className="ml-auto text-sm text-gray-400">${analytics.totals.users} total</span>
+          </div>
+          ${function() {
+            var data = analytics.userGrowth;
+            var maxVal = 0;
+            data.forEach(function(d) { if (d.count > maxVal) maxVal = d.count; });
+            return html`<div className="flex items-end gap-2 justify-center" style=${{ height: '140px' }}>
+              ${data.map(function(d) {
+                var h = maxVal > 0 ? Math.max(Math.round((d.count / maxVal) * 120), 8) : 8;
+                var parts = d.month.split('-');
+                var label = (monthNames[parts[1]] || parts[1]) + ' ' + parts[0].slice(2);
+                return html`<div key=${d.month} className="flex flex-col items-center gap-1 flex-1" style=${{ maxWidth: '60px' }}>
+                  <span className="text-xs text-gray-400 font-bold">${d.count}</span>
+                  <div className="w-full rounded-t-md bg-gradient-to-t from-ocean-600 to-ocean-400 transition-all duration-500" style=${{ height: h + 'px' }} />
+                  <span className="text-[10px] text-gray-500">${label}</span>
+                </div>`;
+              })}
+            </div>`;
+          }()}
+        </${SpotlightCard}>`}
+        <${AdminUsersTab} users=${users} />
+      </${React.Fragment}>`;
+    }
+
+    function AdminRewardsScreen(props) {
+      var analytics = props.data.analytics;
+      var referrals = props.data.referrals;
+      var allRewards = props.data.allRewards;
+      if (!analytics) return null;
+
+      var creditTotal = 0, discountTotal = 0;
+      referrals.forEach(function(ref) {
+        (ref.rewards || []).forEach(function(rw) {
+          if (rw.rewardType === 'CREDITS' && rw.amount) creditTotal += rw.amount;
+          if (rw.rewardType === 'DISCOUNT' && rw.amount) discountTotal += rw.amount;
+        });
+      });
+
+      var redeemPct = analytics.rewardEconomics.totalIssuedAmount > 0
+        ? Math.round((analytics.rewardEconomics.totalRedeemedAmount / analytics.rewardEconomics.totalIssuedAmount) * 100) : 0;
+
+      return html`<${React.Fragment}>
+        <${SpotlightCard}>
+          <h3 className="text-lg font-semibold text-white mb-4">Economia Unitaria</h3>
+          <div className="grid grid-cols-3 gap-3 mb-6">
+            <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-center">
+              <p className="text-xs text-red-400 font-medium">Costo por Lead</p>
+              <p className="text-sm font-bold text-red-300">${formatCLP(analytics.unitEconomics.costPerQualified)}</p>
+            </div>
+            <div className="bg-justo-500/10 border border-justo-500/20 rounded-lg p-3 text-center">
+              <p className="text-xs text-justo-400 font-medium">Gasto Total</p>
+              <p className="text-sm font-bold text-justo-300">${formatCLP(analytics.unitEconomics.totalProgramSpend)}</p>
+            </div>
+            <div className="bg-ocean-500/10 border border-ocean-500/20 rounded-lg p-3 text-center">
+              <p className="text-xs text-ocean-400 font-medium">Prom. x Referido</p>
+              <p className="text-sm font-bold text-ocean-300">${formatCLP(analytics.unitEconomics.avgRewardPerReferral)}</p>
+            </div>
+          </div>
+          <div className="space-y-4">
+            <div>
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-gray-400">Total Emitido</span>
+                <span className="font-bold text-white">${formatCLP(analytics.rewardEconomics.totalIssuedAmount)}</span>
+              </div>
+              <div className="h-4 rounded-full overflow-hidden" style=${{ background: 'rgba(255,255,255,0.06)' }}>
+                <div className="h-full bg-gradient-to-r from-justo-500 to-ocean-500 rounded-full" style=${{ width: '100%' }} />
+              </div>
+            </div>
+            <div>
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-gray-400">Total Canjeado</span>
+                <span className="font-bold text-emerald-400">${formatCLP(analytics.rewardEconomics.totalRedeemedAmount)}</span>
+              </div>
+              <div className="h-4 rounded-full overflow-hidden" style=${{ background: 'rgba(255,255,255,0.06)' }}>
+                <div className="h-full bg-emerald-500/60 rounded-full transition-all duration-500" style=${{ width: redeemPct + '%' }} />
+              </div>
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <span>${redeemPct}% del total emitido</span>
+                <span>Ahorro potencial: ${formatCLP(analytics.rewardEconomics.totalIssuedAmount - analytics.rewardEconomics.totalRedeemedAmount)}</span>
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-3 mt-5">
+            <div className="flex-1 bg-justo-500/10 border border-justo-500/20 rounded-lg p-3 text-center">
+              <p className="text-xs text-justo-400 font-medium">Creditos</p>
+              <p className="text-sm font-bold text-justo-300">${formatCLP(creditTotal)}</p>
+            </div>
+            <div className="flex-1 bg-ocean-500/10 border border-ocean-500/20 rounded-lg p-3 text-center">
+              <p className="text-xs text-ocean-400 font-medium">Descuentos</p>
+              <p className="text-sm font-bold text-ocean-300">${formatCLP(discountTotal)}</p>
+            </div>
+          </div>
+        </${SpotlightCard}>
+
+        ${analytics.rewardBreakdown && analytics.rewardBreakdown.length > 0 && html`<${SpotlightCard}>
+          <div className="flex items-center gap-2 mb-4">
+            <svg className="h-5 w-5 text-justo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"/></svg>
+            <h3 className="text-lg font-semibold text-white">Distribucion de Recompensas por Tipo</h3>
+          </div>
+          <div className="space-y-3">
+            ${function() {
+              var rb = analytics.rewardBreakdown;
+              var maxCount = 0;
+              rb.forEach(function(r) { if (r.count > maxCount) maxCount = r.count; });
+              var typeColors = { CREDITS: 'bg-emerald-500', DISCOUNT: 'bg-orange-500', FEE_WAIVER: 'bg-cyan-500', CUSTOM: 'bg-pink-500' };
+              var typeLabels = { CREDITS: 'Creditos', DISCOUNT: 'Descuentos', FEE_WAIVER: 'Exencion Comision', CUSTOM: 'Personalizado' };
+              return rb.map(function(r) {
+                var pct = maxCount > 0 ? Math.round((r.count / maxCount) * 100) : 0;
+                return html`<div key=${r.type} className="flex items-center gap-3">
+                  <div className="w-32 sm:w-40 text-right shrink-0">
+                    <span className="text-sm text-gray-300 font-medium">${typeLabels[r.type] || r.type}</span>
+                  </div>
+                  <div className="flex-1 h-6 rounded-md overflow-hidden" style=${{ background: 'rgba(255,255,255,0.06)' }}>
+                    <div className=${(typeColors[r.type] || 'bg-gray-500') + '/60 h-full rounded-md transition-all duration-500'} style=${{ width: pct + '%' }} />
+                  </div>
+                  <div className="w-12 text-right shrink-0"><span className="text-sm font-bold text-white">${r.count}</span></div>
+                  <div className="w-24 text-right shrink-0"><span className="text-xs text-gray-400">${r.totalAmount ? formatCLP(r.totalAmount) : '--'}</span></div>
+                </div>`;
+              });
+            }()}
+          </div>
+        </${SpotlightCard}>`}
+        <${AdminRewardsTab} rewards=${allRewards} />
+      </${React.Fragment}>`;
+    }
+
+    function AdminLayout() {
+      var toast = useToast();
+      var hash = useHash();
+      var _r = useState([]), referrals = _r[0], setReferrals = _r[1];
+      var _a = useState(null), analytics = _a[0], setAnalytics = _a[1];
+      var _l = useState(true), loading = _l[0], setLoading = _l[1];
+      var _users = useState([]), users = _users[0], setUsers = _users[1];
+      var _rests = useState([]), adminRestaurants = _rests[0], setAdminRestaurants = _rests[1];
+      var _allRw = useState([]), allRewards = _allRw[0], setAllRewards = _allRw[1];
+
+      useEffect(function() {
+        Promise.all([
+          api('/referrals/admin/all'),
+          api('/analytics/dashboard'),
+          api('/auth/admin/users'),
+          api('/restaurants/admin/all'),
+          api('/rewards/admin/all'),
+        ])
+          .then(function(res) {
+            setReferrals(res[0]);
+            setAnalytics(res[1]);
+            setUsers(res[2]);
+            setAdminRestaurants(res[3]);
+            setAllRewards(res[4]);
+          })
+          .catch(function(err) { toast.addToast('Error al cargar panel admin', 'error'); })
+          .finally(function() { setLoading(false); });
+      }, []);
+
+      if (loading) return html`<div className="space-y-6">
+        <div className="h-8 w-64 rounded shimmer" />
+        <${SkeletonGrid} cols=${3} />
+        <${SkeletonCard} rows=${4} />
+        <${SkeletonCard} rows=${5} />
+      </div>`;
+
+      var navItems = [
+        { path: '/admin', label: 'Resumen', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0h4' },
+        { path: '/admin/analytics', label: 'Analiticas', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
+        { path: '/admin/referrals', label: 'Referidos', icon: 'M13 10V3L4 14h7v7l9-11h-7z' },
+        { path: '/admin/restaurants', label: 'Restaurantes', icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
+        { path: '/admin/users', label: 'Usuarios', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197' },
+        { path: '/admin/rewards', label: 'Recompensas', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1' },
+      ];
+
+      function isAdminActive(path) {
+        return path === '/admin' ? (hash === '/admin' || hash === '/admin/overview') : hash === path;
+      }
+
+      var data = { referrals: referrals, setReferrals: setReferrals, analytics: analytics, users: users, adminRestaurants: adminRestaurants, allRewards: allRewards };
+
+      var screen = null;
+      if (hash.indexOf('/admin/analytics') === 0) {
+        screen = html`<${AdminAnalyticsScreen} data=${data} />`;
+      } else if (hash.indexOf('/admin/referrals') === 0) {
+        screen = html`<${AdminReferralsScreen} data=${data} />`;
+      } else if (hash.indexOf('/admin/restaurants') === 0) {
+        screen = html`<${AdminRestaurantsScreen} data=${data} />`;
+      } else if (hash.indexOf('/admin/users') === 0) {
+        screen = html`<${AdminUsersScreen} data=${data} />`;
+      } else if (hash.indexOf('/admin/rewards') === 0) {
+        screen = html`<${AdminRewardsScreen} data=${data} />`;
+      } else {
+        screen = html`<${AdminOverviewScreen} data=${data} />`;
+      }
+
+      return html`<div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gradient">Panel de Administracion</h2>
+          <p className="text-sm text-gray-500 mt-1">Metricas y gestion del programa de referidos</p>
+        </div>
+
+        <nav className="admin-nav flex gap-1 p-1 rounded-xl overflow-x-auto" style=${{ background: 'rgba(255,255,255,0.06)' }}>
+          ${navItems.map(function(item) {
+            var active = isAdminActive(item.path);
+            return html`<a key=${item.path} href=${'#' + item.path}
+              className=${'flex-1 py-2.5 px-3 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-2 whitespace-nowrap ' +
+                (active ? 'bg-white/10 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5')}>
+              <svg className="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d=${item.icon}/>
+              </svg>
+              <span className="hidden sm:inline">${item.label}</span>
+            </a>`;
+          })}
+        </nav>
+
+        ${screen}
       </div>`;
     }
 
@@ -2373,7 +2443,7 @@
       else if (hash === '/referidos') page = html`<${Referrals} />`;
       else if (hash === '/registrar-restaurante') page = html`<${RegisterRestaurant} />`;
       else if (hash === '/recompensas') page = html`<${Rewards} />`;
-      else if (hash === '/admin' && auth.isAdmin) page = html`<${AdminPanel} />`;
+      else if (hash.indexOf('/admin') === 0 && auth.isAdmin) page = html`<${AdminLayout} />`;
       else page = html`<${Dashboard} />`;
 
       return html`<div className="flex h-screen overflow-hidden">
