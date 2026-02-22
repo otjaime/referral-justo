@@ -8,22 +8,22 @@ const passwordSchema = z
   .regex(/[0-9]/, 'Debe contener al menos un número');
 
 export const registerSchema = z.object({
-  email: z.string().email(),
+  email: z.string().email('Email inválido'),
   password: passwordSchema,
-  name: z.string().min(1).max(100),
+  name: z.string().min(1, 'El nombre es obligatorio').max(100),
 });
 
 export const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
+  email: z.string().email('Email inválido'),
+  password: z.string().min(1, 'La contraseña es obligatoria'),
 });
 
 export const registerWithReferralSchema = z.object({
-  email: z.string().email(),
+  email: z.string().email('Email inválido'),
   password: passwordSchema,
-  name: z.string().min(1).max(100),
-  restaurantName: z.string().min(1).max(200),
-  referralCode: z.string().min(1),
+  name: z.string().min(1, 'El nombre es obligatorio').max(100),
+  restaurantName: z.string().min(1, 'El nombre del restaurante es obligatorio').max(200),
+  referralCode: z.string().min(1, 'El código de referido es obligatorio'),
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;
