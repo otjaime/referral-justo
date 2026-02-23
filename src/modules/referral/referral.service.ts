@@ -1,4 +1,4 @@
-import { ReferralStatus } from '@prisma/client';
+import { ReferralStatus, PipelineStatus } from '@prisma/client';
 import prisma from '../../config/prisma';
 import { config } from '../../config';
 import { generateReferralCode } from '../../utils/codeGenerator';
@@ -8,6 +8,22 @@ import {
   ConflictError,
 } from '../../utils/errors';
 import { enqueueRewardEmission } from '../../jobs/reward.job';
+import { computeAndSaveScore, ScoreResult } from './scoring.service';
+import { PipelineUpdateInput } from './referral.schema';
+
+// ─── Valid pipeline transitions ────────────────────
+
+const VALID_TRANSITIONS: Record<PipelineStatus, PipelineStatus[]> = {
+  [PipelineStatus.PENDING]: [PipelineStatus.QUALIFIED, PipelineStatus.DEAD],
+  [PipelineStatus.QUALIFIED]: [PipelineStatus.DEMO_SCHEDULED, PipelineStatus.NURTURE, PipelineStatus.DEAD],
+  [PipelineStatus.DEMO_SCHEDULED]: [PipelineStatus.MEETING_HELD, PipelineStatus.NO_SHOW, PipelineStatus.DEAD],
+  [PipelineStatus.MEETING_HELD]: [PipelineStatus.WON, PipelineStatus.LOST, PipelineStatus.NURTURE, PipelineStatus.DEAD],
+  [PipelineStatus.WON]: [],
+  [PipelineStatus.LOST]: [PipelineStatus.NURTURE],
+  [PipelineStatus.NO_SHOW]: [PipelineStatus.DEMO_SCHEDULED, PipelineStatus.NURTURE, PipelineStatus.DEAD],
+  [PipelineStatus.NURTURE]: [PipelineStatus.DEMO_SCHEDULED, PipelineStatus.DEAD],
+  [PipelineStatus.DEAD]: [],
+};
 
 export class ReferralService {
   async getOrCreateCode(userId: string) {
@@ -158,7 +174,13 @@ export class ReferralService {
 
     return prisma.referral.findMany({
       where: { referralCodeId: { in: codeIds } },
-      include: {
+      select: {
+        id: true,
+        status: true,
+        scoreTotal: true,
+        pipelineStatus: true,
+        createdAt: true,
+        qualifiedAt: true,
         referredRestaurant: { select: { id: true, name: true, status: true } },
         rewards: { where: { beneficiaryId: userId } },
       },
@@ -211,11 +233,166 @@ export class ReferralService {
             id: true,
             name: true,
             status: true,
+            city: true,
+            numLocations: true,
+            currentPos: true,
+            deliveryPct: true,
+            ownerWhatsapp: true,
+            ownerEmail: true,
             owner: { select: { name: true, email: true } },
           },
         },
         rewards: true,
+        pipelineEvents: {
+          orderBy: { createdAt: 'desc' },
+          take: 5,
+        },
       },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  // ─── Phase 3: Scoring ─────────────────────────────
+
+  async getScore(referralId: string): Promise<ScoreResult> {
+    const referral = await prisma.referral.findUniqueOrThrow({
+      where: { id: referralId },
+      select: {
+        scoreFit: true,
+        scoreIntent: true,
+        scoreEngage: true,
+        scoreTotal: true,
+        scoredAt: true,
+      },
+    });
+
+    // If already scored, return stored values
+    if (referral.scoredAt != null) {
+      return {
+        fit: referral.scoreFit ?? 0,
+        intent: referral.scoreIntent ?? 0,
+        engage: referral.scoreEngage ?? 0,
+        total: referral.scoreTotal ?? 0,
+      };
+    }
+
+    // Otherwise compute fresh
+    return computeAndSaveScore(referralId);
+  }
+
+  // ─── Phase 4: Pipeline ────────────────────────────
+
+  async updatePipeline(referralId: string, data: PipelineUpdateInput, adminUserId: string) {
+    const referral = await prisma.referral.findUniqueOrThrow({
+      where: { id: referralId },
+    });
+
+    const updateData: Record<string, unknown> = {};
+    let needsRescore = false;
+
+    // Handle status transition
+    if (data.status && data.status !== referral.pipelineStatus) {
+      const allowed = VALID_TRANSITIONS[referral.pipelineStatus] || [];
+      if (!allowed.includes(data.status as PipelineStatus)) {
+        throw new ValidationError(
+          `Invalid transition from ${referral.pipelineStatus} to ${data.status}. Allowed: ${allowed.join(', ') || 'none'}`,
+        );
+      }
+      updateData.pipelineStatus = data.status;
+
+      // Track special timestamps
+      if (data.status === 'DEMO_SCHEDULED' && data.demoScheduledAt) {
+        updateData.demoScheduledAt = data.demoScheduledAt;
+      }
+      if (data.status === 'MEETING_HELD') {
+        updateData.meetingHeldAt = new Date();
+        if (data.meetingOutcome) {
+          updateData.meetingOutcome = data.meetingOutcome;
+        }
+      }
+    }
+
+    // Handle optional pipeline fields
+    if (data.note !== undefined) {
+      updateData.notes = data.note;
+    }
+    if (data.nurtureStage !== undefined) {
+      updateData.nurtureStage = data.nurtureStage;
+    }
+    if (data.nextActionAt !== undefined) {
+      updateData.nextActionAt = data.nextActionAt;
+    }
+    if (data.demoScheduledAt !== undefined) {
+      updateData.demoScheduledAt = data.demoScheduledAt;
+    }
+
+    // Handle intent/engagement signal updates
+    const signalFields = [
+      'usedCalculator', 'usedDiagnostic', 'requestedDemo', 'fromMetaAd',
+      'respondedWa', 'openedMessages', 'responseTimeMin',
+    ] as const;
+
+    for (const field of signalFields) {
+      if (data[field] !== undefined) {
+        updateData[field] = data[field];
+        needsRescore = true;
+      }
+    }
+
+    // Perform the update + create event in a transaction
+    const updated = await prisma.$transaction(async (tx) => {
+      const result = await tx.referral.update({
+        where: { id: referralId },
+        data: updateData,
+      });
+
+      // Create status change event
+      if (data.status && data.status !== referral.pipelineStatus) {
+        await tx.pipelineEvent.create({
+          data: {
+            referralId,
+            eventType: 'STATUS_CHANGE',
+            fromStatus: referral.pipelineStatus,
+            toStatus: data.status as PipelineStatus,
+            note: data.note ?? null,
+            createdBy: adminUserId,
+          },
+        });
+      }
+
+      // Create note event if note provided without status change
+      if (data.note && (!data.status || data.status === referral.pipelineStatus)) {
+        await tx.pipelineEvent.create({
+          data: {
+            referralId,
+            eventType: 'NOTE',
+            note: data.note,
+            createdBy: adminUserId,
+          },
+        });
+      }
+
+      return result;
+    });
+
+    // Re-score if signals changed
+    if (needsRescore) {
+      await computeAndSaveScore(referralId);
+    }
+
+    return updated;
+  }
+
+  // ─── Phase 4: Timeline ────────────────────────────
+
+  async getTimeline(referralId: string) {
+    // Verify referral exists
+    await prisma.referral.findUniqueOrThrow({
+      where: { id: referralId },
+    });
+
+    return prisma.pipelineEvent.findMany({
+      where: { referralId },
       orderBy: { createdAt: 'desc' },
     });
   }

@@ -30,6 +30,7 @@ const rewardService = new RewardService();
 
 beforeEach(async () => {
   await prisma.reward.deleteMany();
+  await prisma.pipelineEvent.deleteMany();
   await prisma.referral.deleteMany();
   await prisma.referralCode.deleteMany();
   await prisma.restaurant.deleteMany();

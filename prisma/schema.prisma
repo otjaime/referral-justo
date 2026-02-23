@@ -47,6 +47,28 @@ enum RewardStatus {
   EXPIRED
 }
 
+enum PipelineStatus {
+  PENDING
+  QUALIFIED
+  DEMO_SCHEDULED
+  MEETING_HELD
+  WON
+  LOST
+  NO_SHOW
+  NURTURE
+  DEAD
+}
+
+enum PipelineEventType {
+  STATUS_CHANGE
+  NOTE
+  SCORE_UPDATE
+  CONTACT_ATTEMPT
+  DEMO_SCHEDULED
+  MEETING_HELD
+  AUTO_QUALIFIED
+}
+
 // ─── Models ─────────────────────────────────────────
 
 model User {
@@ -72,6 +94,14 @@ model Restaurant {
   status    RestaurantStatus @default(PENDING)
   createdAt DateTime         @default(now()) @map("created_at")
   updatedAt DateTime         @updatedAt @map("updated_at")
+
+  // Expanded form fields (v2)
+  city          String? @map("city")
+  numLocations  Int?    @map("num_locations")
+  currentPos    String? @map("current_pos")
+  deliveryPct   Int?    @map("delivery_pct")
+  ownerWhatsapp String? @map("owner_whatsapp")
+  ownerEmail    String? @map("owner_email")
 
   owner    User      @relation(fields: [ownerId], references: [id])
   referral Referral?
@@ -103,11 +133,55 @@ model Referral {
   qualifiedAt          DateTime?      @map("qualified_at")
   rewardedAt           DateTime?      @map("rewarded_at")
 
-  referralCode       ReferralCode @relation(fields: [referralCodeId], references: [id])
-  referredRestaurant Restaurant   @relation(fields: [referredRestaurantId], references: [id])
+  // Lead scoring (v2)
+  scoreFit    Int?      @map("score_fit")
+  scoreIntent Int?      @map("score_intent")
+  scoreEngage Int?      @map("score_engage")
+  scoreTotal  Int?      @map("score_total")
+  scoredAt    DateTime? @map("scored_at")
+
+  // Intent/engagement signals (v2)
+  usedCalculator  Boolean @default(false) @map("used_calculator")
+  usedDiagnostic  Boolean @default(false) @map("used_diagnostic")
+  requestedDemo   Boolean @default(false) @map("requested_demo")
+  fromMetaAd      Boolean @default(false) @map("from_meta_ad")
+  respondedWa     Boolean @default(false) @map("responded_wa")
+  openedMessages  Int     @default(0) @map("opened_messages")
+  responseTimeMin Int?    @map("response_time_min")
+
+  // Pipeline (v2)
+  pipelineStatus  PipelineStatus @default(PENDING) @map("pipeline_status")
+  demoScheduledAt DateTime?      @map("demo_scheduled_at")
+  meetingHeldAt   DateTime?      @map("meeting_held_at")
+  meetingOutcome  String?        @map("meeting_outcome")
+  nurtureStage    Int?           @map("nurture_stage")
+  nextActionAt    DateTime?      @map("next_action_at")
+  notes           String?        @map("notes")
+
+  // SLA tracking (v2)
+  sdrContactedAt DateTime? @map("sdr_contacted_at")
+
+  referralCode       ReferralCode    @relation(fields: [referralCodeId], references: [id])
+  referredRestaurant Restaurant      @relation(fields: [referredRestaurantId], references: [id])
   rewards            Reward[]
+  pipelineEvents     PipelineEvent[]
 
   @@map("referrals")
+}
+
+model PipelineEvent {
+  id         String            @id @default(uuid())
+  referralId String            @map("referral_id")
+  eventType  PipelineEventType @map("event_type")
+  fromStatus PipelineStatus?   @map("from_status")
+  toStatus   PipelineStatus?   @map("to_status")
+  note       String?
+  createdBy  String?           @map("created_by")
+  createdAt  DateTime          @default(now()) @map("created_at")
+
+  referral Referral @relation(fields: [referralId], references: [id])
+
+  @@map("pipeline_events")
 }
 
 model Reward {

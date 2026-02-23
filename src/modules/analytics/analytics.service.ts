@@ -71,6 +71,22 @@ interface ReferredHealthRow {
   referredActive: number;
 }
 
+interface ScoreHistogramEntry {
+  range: string;
+  count: number;
+}
+
+interface PipelineDistributionEntry {
+  status: string;
+  count: number;
+}
+
+interface SlaMetricsRow {
+  contacted: number;
+  qualified: number;
+  avg_response_minutes: number | null;
+}
+
 // Business assumptions for revenue impact estimates
 const ASSUMED_MONTHLY_REVENUE_PER_RESTAURANT = 3000000; // $3M CLP
 const ASSUMED_COMMISSION_RATE = 0.15; // 15%
@@ -98,6 +114,9 @@ export class AnalyticsService {
       referredHealthArr,
       userGrowthTimeline,
       rewardsByType,
+      scoreHistogram,
+      pipelineDistribution,
+      slaMetricsArr,
     ] = await Promise.all([
       prisma.user.count(),
       prisma.restaurant.count(),
@@ -266,6 +285,41 @@ export class AnalyticsService {
         _count: { id: true },
         _sum: { amount: true },
       }),
+
+      // Score histogram
+      prisma.$queryRaw<ScoreHistogramEntry[]>`
+        SELECT
+          CASE
+            WHEN score_total IS NULL THEN 'unscored'
+            WHEN score_total <= 20 THEN '0-20'
+            WHEN score_total <= 40 THEN '21-40'
+            WHEN score_total <= 60 THEN '41-60'
+            WHEN score_total <= 80 THEN '61-80'
+            ELSE '81-100'
+          END AS range,
+          COUNT(*)::int AS count
+        FROM referrals
+        GROUP BY range
+        ORDER BY range
+      `,
+
+      // Pipeline distribution
+      prisma.$queryRaw<PipelineDistributionEntry[]>`
+        SELECT pipeline_status::text AS status, COUNT(*)::int AS count
+        FROM referrals
+        GROUP BY pipeline_status
+        ORDER BY pipeline_status
+      `,
+
+      // SLA metrics
+      prisma.$queryRaw<SlaMetricsRow[]>`
+        SELECT
+          COUNT(*) FILTER (WHERE sdr_contacted_at IS NOT NULL AND qualified_at IS NOT NULL)::int AS contacted,
+          COUNT(*) FILTER (WHERE qualified_at IS NOT NULL)::int AS qualified,
+          AVG(EXTRACT(EPOCH FROM (sdr_contacted_at - qualified_at)) / 60)
+            FILTER (WHERE sdr_contacted_at IS NOT NULL AND qualified_at IS NOT NULL) AS avg_response_minutes
+        FROM referrals
+      `,
     ]);
 
     // Referral funnel
@@ -482,6 +536,9 @@ export class AnalyticsService {
       },
       userGrowth: userGrowthTimeline,
       rewardBreakdown,
+      scoreHistogram,
+      pipelineDistribution,
+      slaMetrics: slaMetricsArr[0] || { contacted: 0, qualified: 0, avg_response_minutes: null },
     };
   }
 

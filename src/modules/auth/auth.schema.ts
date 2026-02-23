@@ -21,6 +21,12 @@ export const registerWithReferralSchema = z.object({
   name: z.string().min(1, 'El nombre es obligatorio').max(100),
   restaurantName: z.string().min(1, 'El nombre del restaurante es obligatorio').max(200),
   referralCode: z.string().min(1, 'El código de referido es obligatorio'),
+  city: z.string().max(100).optional(),
+  numLocations: z.coerce.number().int().min(1).optional(),
+  currentPos: z.string().max(100).optional(),
+  deliveryPct: z.coerce.number().int().min(0).max(100).optional(),
+  ownerWhatsapp: z.string().max(20).optional(),
+  ownerEmail: z.string().email().optional(),
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;

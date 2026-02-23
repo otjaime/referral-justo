@@ -6,6 +6,7 @@ import { config } from '../../config';
 import { ConflictError, UnauthorizedError, NotFoundError, ValidationError } from '../../utils/errors';
 import { RegisterInput, LoginInput, RegisterWithReferralInput } from './auth.schema';
 import { JwtPayload } from '../../types/express';
+import { computeAndSaveScore } from '../referral/scoring.service';
 
 export class AuthService {
   async register(data: RegisterInput) {
@@ -88,6 +89,12 @@ export class AuthService {
         data: {
           name: data.restaurantName,
           ownerId: user.id,
+          city: data.city,
+          numLocations: data.numLocations,
+          currentPos: data.currentPos,
+          deliveryPct: data.deliveryPct,
+          ownerWhatsapp: data.ownerWhatsapp,
+          ownerEmail: data.ownerEmail,
         },
       });
 
@@ -96,7 +103,7 @@ export class AuthService {
         data: { useCount: { increment: 1 } },
       });
 
-      await tx.referral.create({
+      const referral = await tx.referral.create({
         data: {
           referralCodeId: referralCode.id,
           referredRestaurantId: restaurant.id,
@@ -104,14 +111,22 @@ export class AuthService {
         },
       });
 
-      return user;
+      return { user, referralId: referral.id };
     });
 
-    const token = this.generateToken(result.id, result.role);
+    // Compute score (await so it's ready when client fetches)
+    try {
+      await computeAndSaveScore(result.referralId);
+    } catch {
+      // Scoring failure should not break registration
+    }
+
+    const token = this.generateToken(result.user.id, result.user.role);
 
     return {
-      user: { id: result.id, email: result.email, name: result.name, role: result.role },
+      user: { id: result.user.id, email: result.user.email, name: result.user.name, role: result.user.role },
       token,
+      referralId: result.referralId,
     };
   }
 

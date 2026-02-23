@@ -333,6 +333,31 @@
       return html`<span className=${'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ' + entry[1]}>${entry[0]}</span>`;
     }
 
+    // ─── Pipeline Status Badge ──────────────────────────
+    function PipelineBadge(props) {
+      var map = {
+        PENDING: ['Pendiente', 'bg-gray-500/15 text-gray-400 border border-gray-500/20'],
+        QUALIFIED: ['Calificado', 'bg-yellow-500/15 text-yellow-300 border border-yellow-500/20'],
+        DEMO_SCHEDULED: ['Demo', 'bg-blue-500/15 text-blue-300 border border-blue-500/20'],
+        MEETING_HELD: ['Meeting', 'bg-purple-500/15 text-purple-300 border border-purple-500/20'],
+        WON: ['WON', 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/20'],
+        LOST: ['LOST', 'bg-red-500/15 text-red-300 border border-red-500/20'],
+        NO_SHOW: ['No-Show', 'bg-orange-500/15 text-orange-300 border border-orange-500/20'],
+        NURTURE: ['Nurture', 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/20'],
+        DEAD: ['Dead', 'bg-gray-500/15 text-gray-500 border border-gray-500/20'],
+      };
+      var entry = map[props.status] || [props.status, 'bg-gray-500/15 text-gray-400 border border-gray-500/20'];
+      return html`<span className=${'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ' + entry[1]}>${entry[0]}</span>`;
+    }
+
+    // ─── Score Badge ──────────────────────────────────────
+    function ScoreBadge(props) {
+      var score = props.score;
+      if (score == null) return html`<span className="text-xs text-gray-600">--</span>`;
+      var cls = score >= 60 ? 'text-emerald-400' : score >= 40 ? 'text-yellow-400' : 'text-red-400';
+      return html`<span className=${'text-sm font-bold ' + cls}>${score}</span>`;
+    }
+
     function Spinner(props) {
       var cls = props.className || 'h-5 w-5';
       return html`<svg className=${'animate-spin ' + cls} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>`;
@@ -663,7 +688,7 @@
       function shareWhatsApp() {
         if (!code) return;
         var link = window.location.origin + '/#/invite/' + code.code;
-        var msg = 'Te invito a unirte a Justo! Registra tu restaurante con mi link: ' + link;
+        var msg = 'Hola! Llevo usando Justo para mi restaurante y me ha funcionado muy bien.\nTe comparto mi codigo de referido: ' + code.code + '\nRegistrate aqui: ' + link + '\nSi te activas, ambos ganamos $50.000 en creditos 🎉';
         window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
       }
 
@@ -840,7 +865,10 @@
                       <p className="text-sm font-medium text-white">${r.referredRestaurant.name}</p>
                       <p className="text-xs text-gray-500">${new Date(r.createdAt).toLocaleDateString('es-CL')}</p>
                     </div>
-                    <${StatusBadge} status=${r.status} />
+                    <div className="flex items-center gap-2">
+                      <${ScoreBadge} score=${r.scoreTotal} />
+                      <${StatusBadge} status=${r.status} />
+                    </div>
                   </div>`;
                 })}
                 ${sent.length > 5 && html`<a href="#/referidos" className="block text-center text-sm text-justo-400 hover:text-justo-300 font-medium pt-2">Ver todos (${sent.length})</a>`}
@@ -886,14 +914,16 @@
             : html`<div className="overflow-x-auto"><table className="w-full">
                 <thead><tr className="border-b border-white/[0.06]">
                   <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Restaurante</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Estado</th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                  <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase">Score</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Estado</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Fecha</th>
                 </tr></thead>
                 <tbody>${sent.map(function(r) {
                   return html`<tr key=${r.id} className="border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02] transition-colors">
                     <td className="px-6 py-4 text-sm font-medium text-white">${r.referredRestaurant.name}</td>
-                    <td className="px-6 py-4"><${StatusBadge} status=${r.status} /></td>
-                    <td className="px-6 py-4 text-sm text-gray-400">${new Date(r.createdAt).toLocaleDateString('es-CL')}</td>
+                    <td className="px-4 py-4 text-center"><${ScoreBadge} score=${r.scoreTotal} /></td>
+                    <td className="px-4 py-4"><${StatusBadge} status=${r.status} /></td>
+                    <td className="px-4 py-4 text-sm text-gray-400">${new Date(r.createdAt).toLocaleDateString('es-CL')}</td>
                   </tr>`;
                 })}</tbody>
               </table></div>`}
@@ -1759,6 +1789,66 @@
               <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-emerald-500/50" /><span className="text-xs text-gray-500">Recompensados</span></div>
             </div>
           </${SpotlightCard}>`}
+
+          ${analytics.pipelineDistribution && html`<${SpotlightCard}>
+            <h3 className="text-lg font-semibold text-white mb-4">Pipeline de Referidos</h3>
+            <div className="flex items-center gap-1 flex-wrap">
+              ${function() {
+                var pipeColors = { PENDING: 'bg-gray-500', QUALIFIED: 'bg-yellow-500', DEMO_SCHEDULED: 'bg-blue-500', MEETING_HELD: 'bg-purple-500', WON: 'bg-emerald-500', LOST: 'bg-red-500', NO_SHOW: 'bg-orange-500', NURTURE: 'bg-cyan-500', DEAD: 'bg-gray-600' };
+                var pipeLabels = { PENDING: 'Pendiente', QUALIFIED: 'Calificado', DEMO_SCHEDULED: 'Demo', MEETING_HELD: 'Meeting', WON: 'WON', LOST: 'LOST', NO_SHOW: 'No-Show', NURTURE: 'Nurture', DEAD: 'Dead' };
+                var total = 0;
+                analytics.pipelineDistribution.forEach(function(p) { total += p.count; });
+                return analytics.pipelineDistribution.map(function(p) {
+                  var w = total > 0 ? Math.max(Math.round(p.count / total * 100), 3) : 0;
+                  return html`<div key=${p.status} className="text-center" style=${{ flex: w + ' 0 0' }}>
+                    <div className=${(pipeColors[p.status] || 'bg-gray-500') + ' h-8 rounded-md flex items-center justify-center'}>
+                      <span className="text-xs font-bold text-white">${p.count}</span>
+                    </div>
+                    <p className="text-[10px] text-gray-500 mt-1 truncate">${pipeLabels[p.status] || p.status}</p>
+                  </div>`;
+                });
+              }()}
+            </div>
+          </${SpotlightCard}>`}
+
+          ${analytics.scoreHistogram && html`<${SpotlightCard}>
+            <h3 className="text-lg font-semibold text-white mb-4">Distribucion de Lead Score</h3>
+            <div className="space-y-2">
+              ${function() {
+                var maxCount = 0;
+                analytics.scoreHistogram.forEach(function(s) { if (s.count > maxCount) maxCount = s.count; });
+                var rangeColors = { 'unscored': 'bg-gray-500', '0-20': 'bg-red-500', '21-40': 'bg-orange-500', '41-60': 'bg-yellow-500', '61-80': 'bg-emerald-500', '81-100': 'bg-green-400' };
+                return analytics.scoreHistogram.map(function(s) {
+                  var pct = maxCount > 0 ? Math.round(s.count / maxCount * 100) : 0;
+                  return html`<div key=${s.range} className="flex items-center gap-3">
+                    <span className="text-xs text-gray-400 w-16 text-right font-mono">${s.range}</span>
+                    <div className="flex-1 h-5 rounded-md overflow-hidden" style=${{ background: 'rgba(255,255,255,0.06)' }}>
+                      <div className=${(rangeColors[s.range] || 'bg-gray-500') + '/60 h-full rounded-md transition-all duration-500'} style=${{ width: pct + '%' }} />
+                    </div>
+                    <span className="text-xs font-bold text-white w-8 text-right">${s.count}</span>
+                  </div>`;
+                });
+              }()}
+            </div>
+          </${SpotlightCard}>`}
+
+          ${analytics.slaMetrics && html`<${SpotlightCard}>
+            <h3 className="text-lg font-semibold text-white mb-4">SLA de Contacto</h3>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-white">${analytics.slaMetrics.contacted}</p>
+                <p className="text-xs text-gray-500">Contactados</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-white">${analytics.slaMetrics.qualified}</p>
+                <p className="text-xs text-gray-500">Calificados</p>
+              </div>
+              <div className="text-center">
+                <p className=${'text-2xl font-bold ' + (analytics.slaMetrics.avg_response_minutes != null ? (analytics.slaMetrics.avg_response_minutes <= 5 ? 'text-emerald-400' : analytics.slaMetrics.avg_response_minutes <= 10 ? 'text-yellow-400' : 'text-red-400') : 'text-gray-500')}>${analytics.slaMetrics.avg_response_minutes != null ? Math.round(analytics.slaMetrics.avg_response_minutes) + ' min' : '--'}</p>
+                <p className="text-xs text-gray-500">Tiempo Respuesta</p>
+              </div>
+            </div>
+          </${SpotlightCard}>`}
       </${React.Fragment}>`;
     }
 
@@ -1882,22 +1972,26 @@
                   <thead><tr className="border-b border-white/[0.06]">
                     <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Referente</th>
                     <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Restaurante</th>
-                    <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Estado</th>
-                    <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Fecha</th>
-                    <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                    <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase">Score</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Pipeline</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Estado</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Acciones</th>
                   </tr></thead>
                   <tbody>${paginatedReferrals.map(function(r) {
                     var ref = r.referralCode && r.referralCode.referrer;
                     var rest = r.referredRestaurant;
-                    return html`<tr key=${r.id} className="border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02] transition-colors">
+                    return html`<tr key=${r.id} className="border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02] transition-colors cursor-pointer" onClick=${function() { navigate('/admin/referrals/' + r.id); }}>
                       <td className="px-6 py-4">
                         <p className="text-sm font-medium text-white">${ref && ref.name}</p>
                         <p className="text-xs text-gray-500">${ref && ref.email}</p>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-300">${rest && rest.name}</td>
-                      <td className="px-6 py-4"><${StatusBadge} status=${r.status} /></td>
-                      <td className="px-6 py-4 text-sm text-gray-400">${new Date(r.createdAt).toLocaleDateString('es-CL')}</td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-4 text-center"><${ScoreBadge} score=${r.scoreTotal} /></td>
+                      <td className="px-4 py-4"><${PipelineBadge} status=${r.pipelineStatus} /></td>
+                      <td className="px-4 py-4"><${StatusBadge} status=${r.status} /></td>
+                      <td className="px-4 py-4 text-sm text-gray-400">${new Date(r.createdAt).toLocaleDateString('es-CL')}</td>
+                      <td className="px-4 py-4" onClick=${function(e) { e.stopPropagation(); }}>
                         ${r.status === 'PENDING' && html`<button onClick=${function() { qualify(r.id); }} disabled=${qualifyingId === r.id}
                           className="btn-primary text-xs px-3 py-1.5">
                           ${qualifyingId === r.id ? html`<${Spinner} className="h-3 w-3" />` : 'Calificar'}
@@ -2102,6 +2196,234 @@
       </${React.Fragment}>`;
     }
 
+    // ─── Referral Detail Screen ──────────────────────────
+    function ReferralDetailScreen(props) {
+      var toast = useToast();
+      var referralId = props.referralId;
+      var data = props.data;
+      var _tab = useState('detail'), tab = _tab[0], setTab = _tab[1];
+      var _timeline = useState([]), timeline = _timeline[0], setTimeline = _timeline[1];
+      var _score = useState(null), score = _score[0], setScore = _score[1];
+      var _updating = useState(false), updating = _updating[0], setUpdating = _updating[1];
+
+      var referral = null;
+      if (data.referrals) {
+        referral = data.referrals.find(function(r) { return r.id === referralId; });
+      }
+
+      useEffect(function() {
+        if (!referralId) return;
+        api('/referrals/' + referralId + '/timeline').then(setTimeline).catch(function() {});
+        api('/referrals/' + referralId + '/score').then(setScore).catch(function() {});
+      }, [referralId]);
+
+      if (!referral) return html`<div className="text-center py-12">
+        <p className="text-gray-400">Referido no encontrado</p>
+        <a href="#/admin/referrals" className="text-justo-400 text-sm mt-2 inline-block">Volver a referidos</a>
+      </div>`;
+
+      var ref = referral.referralCode && referral.referralCode.referrer;
+      var rest = referral.referredRestaurant;
+
+      function pipelineAction(status, extra) {
+        setUpdating(true);
+        var body = Object.assign({ status: status }, extra || {});
+        api('/referrals/' + referralId + '/pipeline', { method: 'PATCH', body: JSON.stringify(body) })
+          .then(function() {
+            toast.addToast('Pipeline actualizado');
+            // Refresh timeline
+            api('/referrals/' + referralId + '/timeline').then(setTimeline).catch(function() {});
+            // Update local state
+            if (data.setReferrals) {
+              data.setReferrals(function(prev) {
+                return prev.map(function(r) {
+                  return r.id === referralId ? Object.assign({}, r, { pipelineStatus: status }) : r;
+                });
+              });
+            }
+          })
+          .catch(function(err) { toast.addToast(err.message, 'error'); })
+          .finally(function() { setUpdating(false); });
+      }
+
+      var pipelineButtons = [];
+      var ps = referral.pipelineStatus;
+      if (ps === 'PENDING') pipelineButtons = [{ label: 'Calificar', status: 'QUALIFIED', cls: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30' }, { label: 'Descartar', status: 'DEAD', cls: 'bg-gray-500/20 text-gray-400 border-gray-500/30' }];
+      else if (ps === 'QUALIFIED') pipelineButtons = [{ label: 'Agendar Demo', status: 'DEMO_SCHEDULED', cls: 'bg-blue-500/20 text-blue-300 border-blue-500/30' }, { label: 'Nurture', status: 'NURTURE', cls: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30' }];
+      else if (ps === 'DEMO_SCHEDULED') pipelineButtons = [{ label: 'Meeting Realizado', status: 'MEETING_HELD', cls: 'bg-purple-500/20 text-purple-300 border-purple-500/30' }, { label: 'No-Show', status: 'NO_SHOW', cls: 'bg-orange-500/20 text-orange-300 border-orange-500/30' }];
+      else if (ps === 'MEETING_HELD') pipelineButtons = [{ label: 'WON', status: 'WON', cls: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' }, { label: 'LOST', status: 'LOST', cls: 'bg-red-500/20 text-red-300 border-red-500/30' }];
+      else if (ps === 'NO_SHOW') pipelineButtons = [{ label: 'Reagendar Demo', status: 'DEMO_SCHEDULED', cls: 'bg-blue-500/20 text-blue-300 border-blue-500/30' }, { label: 'Nurture', status: 'NURTURE', cls: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30' }];
+      else if (ps === 'LOST') pipelineButtons = [{ label: 'Nurture', status: 'NURTURE', cls: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30' }];
+      else if (ps === 'NURTURE') pipelineButtons = [{ label: 'Agendar Demo', status: 'DEMO_SCHEDULED', cls: 'bg-blue-500/20 text-blue-300 border-blue-500/30' }, { label: 'Descartar', status: 'DEAD', cls: 'bg-gray-500/20 text-gray-400 border-gray-500/30' }];
+
+      // Chatbot simulation messages
+      function buildChatMessages() {
+        var msgs = [];
+        var ownerName = rest && rest.owner ? rest.owner.name : 'Restaurante';
+        var referrerN = ref ? ref.name : 'Un amigo';
+        var restName = rest ? rest.name : 'tu restaurante';
+        var t = new Date(referral.createdAt);
+        function ts(offset) { var d = new Date(t.getTime() + offset * 60000); return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0'); }
+
+        msgs.push({ from: 'bot', text: 'Hola ' + ownerName + '! ' + referrerN + ' te recomendo Justo para ' + restName + '. Te gustaria saber como podemos ayudarte?', time: ts(0) });
+        msgs.push({ from: 'user', text: 'Si, cuentame', time: ts(1) });
+
+        if (rest && rest.city) {
+          msgs.push({ from: 'bot', text: 'En que ciudad esta ' + restName + '?', time: ts(1) });
+          msgs.push({ from: 'user', text: rest.city, time: ts(2) });
+        }
+
+        if (rest && rest.numLocations) {
+          msgs.push({ from: 'bot', text: 'Cuantos locales tiene ' + restName + '?', time: ts(2) });
+          msgs.push({ from: 'user', text: rest.numLocations === 1 ? '1 local' : rest.numLocations + ' locales', time: ts(3) });
+        }
+
+        if (rest && rest.currentPos) {
+          msgs.push({ from: 'bot', text: 'Usas algun sistema POS actualmente?', time: ts(3) });
+          var posText = rest.currentPos === 'none' ? 'No uso POS' : 'Si, uso ' + rest.currentPos.charAt(0).toUpperCase() + rest.currentPos.slice(1);
+          msgs.push({ from: 'user', text: posText, time: ts(4) });
+        }
+
+        if (rest && rest.deliveryPct != null) {
+          msgs.push({ from: 'bot', text: 'Que porcentaje de tus ventas va por Rappi o Uber Eats?', time: ts(4) });
+          msgs.push({ from: 'user', text: rest.deliveryPct > 0 ? 'Como un ' + rest.deliveryPct + '%' : 'No hago delivery', time: ts(5) });
+        }
+
+        var s = score || { fit: referral.scoreTotal ? Math.round(referral.scoreTotal * 0.4) : 0, intent: 0, engage: referral.scoreTotal ? Math.round(referral.scoreTotal * 0.3) : 0, total: referral.scoreTotal || 0 };
+        var statusLabel = s.total >= 60 ? 'CALIFICADO' : 'PENDIENTE';
+        msgs.push({ from: 'bot', text: 'Listo! Analice tu perfil:\n\nScore: ' + s.total + '/100 ' + (s.total >= 60 ? '✓' : '') + ' ' + statusLabel + '\nFIT: ' + s.fit + '  INTENT: ' + s.intent + '  ENGAGE: ' + s.engage + '\n\nUn ejecutivo de Justo te contactara en menos de 5 minutos.', time: ts(6) });
+
+        return msgs;
+      }
+
+      return html`<div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <a href="#/admin/referrals" className="text-gray-400 hover:text-white transition-colors">
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"/></svg>
+          </a>
+          <h3 className="text-xl font-bold text-white">${rest && rest.name}</h3>
+          <${PipelineBadge} status=${referral.pipelineStatus} />
+          <${StatusBadge} status=${referral.status} />
+        </div>
+
+        <div className="flex rounded-lg p-1 w-fit" style=${{ background: 'rgba(255,255,255,0.06)' }}>
+          ${['detail', 'timeline', 'chat'].map(function(t) {
+            var labels = { detail: 'Detalle', timeline: 'Timeline', chat: 'Conversacion' };
+            return html`<button key=${t} onClick=${function() { setTab(t); }}
+              className=${'px-4 py-2 text-sm font-medium rounded-md transition-colors ' + (tab === t ? 'bg-white/10 text-white' : 'text-gray-500')}>${labels[t]}</button>`;
+          })}
+        </div>
+
+        ${tab === 'detail' && html`<div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <${SpotlightCard}>
+            <h4 className="text-sm font-semibold text-gray-400 mb-3">Informacion del Restaurante</h4>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm"><span className="text-gray-400">Nombre</span><span className="text-white font-medium">${rest && rest.name}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-gray-400">Ciudad</span><span className="text-white">${rest && rest.city || '--'}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-gray-400">Locales</span><span className="text-white">${rest && rest.numLocations || '--'}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-gray-400">POS</span><span className="text-white">${rest && rest.currentPos || '--'}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-gray-400">Delivery %</span><span className="text-white">${rest && rest.deliveryPct != null ? rest.deliveryPct + '%' : '--'}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-gray-400">WhatsApp</span><span className="text-white">${rest && rest.ownerWhatsapp || '--'}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-gray-400">Dueno</span><span className="text-white">${rest && rest.owner ? rest.owner.name : '--'}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-gray-400">Email</span><span className="text-white">${rest && rest.ownerEmail || (rest && rest.owner ? rest.owner.email : '--')}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-gray-400">Referido por</span><span className="text-justo-400 font-medium">${ref ? ref.name : '--'}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-gray-400">Fecha</span><span className="text-white">${new Date(referral.createdAt).toLocaleDateString('es-CL')}</span></div>
+            </div>
+          </${SpotlightCard}>
+
+          <${SpotlightCard}>
+            <h4 className="text-sm font-semibold text-gray-400 mb-3">Lead Score</h4>
+            ${score ? html`<div>
+              <div className="flex items-center gap-3 mb-4">
+                <div className=${'w-16 h-16 rounded-full flex items-center justify-center text-xl font-black border-2 ' + (score.total >= 60 ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400' : score.total >= 40 ? 'bg-yellow-500/15 border-yellow-500/30 text-yellow-400' : 'bg-red-500/15 border-red-500/30 text-red-400')}>${score.total}</div>
+                <div>
+                  <p className=${'text-sm font-bold ' + (score.total >= 60 ? 'text-emerald-400' : score.total >= 40 ? 'text-yellow-400' : 'text-red-400')}>${score.total >= 60 ? 'CALIFICADO' : 'PENDIENTE'}</p>
+                  <p className="text-xs text-gray-500">de 100 puntos</p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                ${[
+                  { label: 'FIT', value: score.fit, max: 45 },
+                  { label: 'INTENT', value: score.intent, max: 65 },
+                  { label: 'ENGAGE', value: score.engage, max: 55 },
+                ].map(function(bar) {
+                  var pct = bar.max > 0 ? Math.round(bar.value / bar.max * 100) : 0;
+                  return html`<div key=${bar.label}>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-gray-400 font-bold">${bar.label}</span>
+                      <span className="text-white">${bar.value}/${bar.max}</span>
+                    </div>
+                    <div className="h-2.5 rounded-full overflow-hidden" style=${{ background: 'rgba(255,255,255,0.08)' }}>
+                      <div className="h-full rounded-full bg-gradient-to-r from-justo-500 to-ocean-400 transition-all duration-500" style=${{ width: pct + '%' }} />
+                    </div>
+                  </div>`;
+                })}
+              </div>
+            </div>` : html`<p className="text-gray-500 text-sm">Cargando score...</p>`}
+          </${SpotlightCard}>
+
+          <${SpotlightCard} className="lg:col-span-2">
+            <h4 className="text-sm font-semibold text-gray-400 mb-3">Acciones de Pipeline</h4>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-sm text-gray-400">Estado actual:</span>
+              <${PipelineBadge} status=${referral.pipelineStatus} />
+            </div>
+            ${pipelineButtons.length > 0 ? html`<div className="flex gap-2 flex-wrap">
+              ${pipelineButtons.map(function(btn) {
+                return html`<button key=${btn.status} onClick=${function() { pipelineAction(btn.status); }} disabled=${updating}
+                  className=${'px-4 py-2 rounded-lg text-sm font-medium border transition-colors hover:brightness-110 ' + btn.cls}>
+                  ${updating ? html`<${Spinner} className="h-4 w-4" />` : btn.label}
+                </button>`;
+              })}
+            </div>` : html`<p className="text-gray-500 text-sm">Estado terminal - no hay acciones disponibles</p>`}
+          </${SpotlightCard}>
+        </div>`}
+
+        ${tab === 'timeline' && html`<${SpotlightCard}>
+          <h4 className="text-sm font-semibold text-gray-400 mb-4">Cronologia</h4>
+          ${timeline.length === 0 ? html`<p className="text-gray-500 text-sm">Sin eventos registrados</p>` :
+            html`<div className="space-y-0">
+              ${timeline.map(function(ev, i) {
+                var isLast = i === timeline.length - 1;
+                return html`<div key=${ev.id} className="flex gap-3">
+                  <div className="flex flex-col items-center">
+                    <div className=${'w-3 h-3 rounded-full mt-1.5 flex-shrink-0 ' + (ev.eventType === 'STATUS_CHANGE' ? 'bg-justo-500' : ev.eventType === 'NOTE' ? 'bg-gray-500' : 'bg-ocean-500')} />
+                    ${!isLast && html`<div className="w-0.5 flex-1 bg-white/10 my-1" />`}
+                  </div>
+                  <div className=${'pb-4 ' + (isLast ? '' : '')}>
+                    <div className="flex items-center gap-2">
+                      ${ev.fromStatus && ev.toStatus ? html`<span className="text-sm text-white font-medium">${ev.fromStatus} → ${ev.toStatus}</span>` :
+                        html`<span className="text-sm text-white font-medium">${ev.eventType}</span>`}
+                    </div>
+                    ${ev.note && html`<p className="text-xs text-gray-400 mt-0.5">${ev.note}</p>`}
+                    <p className="text-[10px] text-gray-600 mt-0.5">${new Date(ev.createdAt).toLocaleString('es-CL')}</p>
+                  </div>
+                </div>`;
+              })}
+            </div>`}
+        </${SpotlightCard}>`}
+
+        ${tab === 'chat' && html`<${SpotlightCard}>
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-lg">💬</span>
+            <h4 className="text-sm font-semibold text-white">Conversacion de Calificacion</h4>
+            <span className="text-xs text-gray-500">${rest && rest.name} · ${rest && rest.owner ? rest.owner.name : ''} · ${new Date(referral.createdAt).toLocaleDateString('es-CL')}</span>
+          </div>
+          <div className="space-y-3 max-h-[500px] overflow-y-auto" style=${{ background: 'rgba(0,0,0,0.2)', borderRadius: '0.75rem', padding: '1rem' }}>
+            ${buildChatMessages().map(function(msg, i) {
+              var isBot = msg.from === 'bot';
+              return html`<div key=${i} className=${'flex ' + (isBot ? 'justify-start' : 'justify-end')}>
+                <div className=${'max-w-[80%] rounded-xl px-3 py-2 ' + (isBot ? 'bg-white/[0.08] text-white' : 'bg-emerald-600/30 text-emerald-100')} style=${{ whiteSpace: 'pre-wrap' }}>
+                  <p className="text-sm">${msg.text}</p>
+                  <p className=${'text-[10px] mt-1 text-right ' + (isBot ? 'text-gray-500' : 'text-emerald-300/60')}>${msg.time}</p>
+                </div>
+              </div>`;
+            })}
+          </div>
+        </${SpotlightCard}>`}
+      </div>`;
+    }
+
     function AdminLayout() {
       var toast = useToast();
       var hash = useHash();
@@ -2157,6 +2479,9 @@
       var screen = null;
       if (hash.indexOf('/admin/analytics') === 0) {
         screen = html`<${AdminAnalyticsScreen} data=${data} />`;
+      } else if (hash.match(/^\/admin\/referrals\/[a-f0-9-]+$/)) {
+        var detailId = hash.replace('/admin/referrals/', '');
+        screen = html`<${ReferralDetailScreen} referralId=${detailId} data=${data} />`;
       } else if (hash.indexOf('/admin/referrals') === 0) {
         screen = html`<${AdminReferralsScreen} data=${data} />`;
       } else if (hash.indexOf('/admin/restaurants') === 0) {
@@ -2203,9 +2528,10 @@
       var _bd = useState(null), benefitData = _bd[0], setBenefitData = _bd[1];
       var _tr = useState(0), totalReferrals = _tr[0], setTotalReferrals = _tr[1];
       var _step = useState(0), step = _step[0], setStep = _step[1];
-      var _f = useState({ restaurantName: '', name: '', email: '', password: '' }), form = _f[0], setForm = _f[1];
+      var _f = useState({ restaurantName: '', name: '', email: '', password: '', city: '', numLocations: '', currentPos: '', deliveryPct: '', whatsapp: '' }), form = _f[0], setForm = _f[1];
       var _ld = useState(false), loading = _ld[0], setLoading = _ld[1];
       var _e = useState(''), error = _e[0], setError = _e[1];
+      var _scorePreview = useState(null), scorePreview = _scorePreview[0], setScorePreview = _scorePreview[1];
 
       useEffect(function() {
         if (!code) { setRefStatus('invalid'); return; }
@@ -2229,13 +2555,25 @@
             email: form.email,
             password: form.password,
             restaurantName: form.restaurantName,
-            referralCode: code
+            referralCode: code,
+            city: form.city || undefined,
+            numLocations: form.numLocations ? parseInt(form.numLocations) : undefined,
+            currentPos: form.currentPos || undefined,
+            deliveryPct: form.deliveryPct ? parseInt(form.deliveryPct) : undefined,
+            ownerWhatsapp: form.whatsapp || undefined,
+            ownerEmail: form.email || undefined,
           })
         })
           .then(function(data) {
             auth.login(data.user, data.token);
-            toast.addToast('Tu restaurante ha sido registrado en Justo!');
-            navigate('/');
+            if (data.referralId) {
+              api('/referrals/' + data.referralId + '/score')
+                .then(function(score) { setScorePreview(score); })
+                .catch(function() { navigate('/'); });
+            } else {
+              toast.addToast('Tu restaurante ha sido registrado en Justo!');
+              navigate('/');
+            }
           })
           .catch(function(err) { setError(err.message); })
           .finally(function() { setLoading(false); });
@@ -2260,7 +2598,41 @@
       var referrerInitial = referrerName ? referrerName.charAt(0).toUpperCase() : '?';
 
       // Step indicators
-      var stepLabels = ['Tu beneficio', 'Tu restaurante', 'Tu cuenta'];
+      var stepLabels = ['Tu beneficio', 'Tu restaurante', 'Tu negocio', 'Tu cuenta'];
+
+      // Score preview overlay
+      if (scorePreview) return html`<div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+        <${BackgroundBeams} />
+        <${FloatingOrbs} />
+        <div className="w-full max-w-md relative z-10 text-center">
+          <div className="glass rounded-2xl p-8">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-justo-500 to-ocean-500 mb-6">
+              <span className="text-3xl font-black text-white"><${AnimatedCounter} value=${scorePreview.total} duration=${1500} /></span>
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-2">Registrado exitosamente!</h2>
+            <p className="text-gray-400 mb-6">Tu perfil tiene un score de <span className="text-white font-bold">${scorePreview.total}/100</span></p>
+            <div className="space-y-3 mb-6">
+              ${[
+                { label: 'FIT', value: scorePreview.fit, max: 45, color: 'from-blue-500 to-blue-400' },
+                { label: 'INTENT', value: scorePreview.intent, max: 65, color: 'from-purple-500 to-purple-400' },
+                { label: 'ENGAGE', value: scorePreview.engage, max: 55, color: 'from-emerald-500 to-emerald-400' },
+              ].map(function(bar) {
+                return html`<div key=${bar.label} className="flex items-center gap-3">
+                  <span className="text-xs font-bold text-gray-400 w-14 text-right">${bar.label}</span>
+                  <div className="flex-1 h-3 rounded-full overflow-hidden" style=${{ background: 'rgba(255,255,255,0.08)' }}>
+                    <div className=${'h-full rounded-full bg-gradient-to-r ' + bar.color + ' transition-all duration-1000'} style=${{ width: (bar.max > 0 ? Math.round(bar.value / bar.max * 100) : 0) + '%' }} />
+                  </div>
+                  <span className="text-xs font-bold text-white w-10">${bar.value}/${bar.max}</span>
+                </div>`;
+              })}
+            </div>
+            ${scorePreview.total >= 60
+              ? html`<p className="text-emerald-400 text-sm font-medium mb-4">Un ejecutivo te contactara en menos de 5 minutos.</p>`
+              : html`<p className="text-gray-400 text-sm mb-4">Nuestro equipo revisara tu perfil pronto.</p>`}
+            <button onClick=${function() { toast.addToast('Bienvenido a Justo!'); navigate('/'); }} className="w-full btn-primary py-3">Ir al Dashboard</button>
+          </div>
+        </div>
+      </div>`;
 
       var stepBar = html`<div className="flex items-center justify-center gap-2 mb-8">
         ${stepLabels.map(function(label, i) {
@@ -2366,7 +2738,87 @@
         </div>
       </div>`;
 
-      // Step 2: Account creation
+      // Step 2: Business details (NEW - scoring fields)
+      if (step === 2) return html`<div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+        <${BackgroundBeams} />
+        <${FloatingOrbs} />
+        <div className="w-full max-w-lg relative z-10">
+          <div className="text-center mb-6">
+            <img src="/justo-logo.svg" alt="Justo" className="h-8 mx-auto" />
+          </div>
+          <div className="glass rounded-2xl p-8">
+            ${stepBar}
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-justo-500/15 border border-justo-500/20 text-justo-400 mb-3">
+                <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+              </div>
+              <h2 className="text-xl font-bold text-white">Sobre tu negocio</h2>
+              <p className="text-sm text-gray-400 mt-1">Esto nos ayuda a personalizar tu experiencia</p>
+            </div>
+            <form onSubmit=${function(e) { e.preventDefault(); setStep(3); }} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Ciudad</label>
+                <select value=${form.city} onChange=${function(e) { setForm(Object.assign({}, form, { city: e.target.value })); }}
+                  className="input-dark" required>
+                  <option value="">Selecciona tu ciudad</option>
+                  <option value="Santiago">Santiago</option>
+                  <option value="Valparaiso">Valparaiso</option>
+                  <option value="Concepcion">Concepcion</option>
+                  <option value="Antofagasta">Antofagasta</option>
+                  <option value="Temuco">Temuco</option>
+                  <option value="Otra">Otra</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Cuantos locales tienes?</label>
+                <select value=${form.numLocations} onChange=${function(e) { setForm(Object.assign({}, form, { numLocations: e.target.value })); }}
+                  className="input-dark" required>
+                  <option value="">Selecciona</option>
+                  <option value="1">1 local</option>
+                  <option value="2">2-3 locales</option>
+                  <option value="4">4-5 locales</option>
+                  <option value="6">6+ locales</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Usas sistema POS actualmente?</label>
+                <select value=${form.currentPos} onChange=${function(e) { setForm(Object.assign({}, form, { currentPos: e.target.value })); }}
+                  className="input-dark" required>
+                  <option value="">Selecciona</option>
+                  <option value="none">No uso POS</option>
+                  <option value="toteat">Toteat</option>
+                  <option value="fudo">Fudo</option>
+                  <option value="square">Square</option>
+                  <option value="other">Otro</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Porcentaje de ventas por delivery?</label>
+                <select value=${form.deliveryPct} onChange=${function(e) { setForm(Object.assign({}, form, { deliveryPct: e.target.value })); }}
+                  className="input-dark" required>
+                  <option value="">Selecciona</option>
+                  <option value="0">No hago delivery</option>
+                  <option value="10">Menos del 15%</option>
+                  <option value="20">15-30%</option>
+                  <option value="40">31-50%</option>
+                  <option value="60">Mas del 50%</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">WhatsApp <span className="text-gray-500">(opcional)</span></label>
+                <input type="tel" value=${form.whatsapp} onInput=${function(e) { setForm(Object.assign({}, form, { whatsapp: e.target.value })); }}
+                  className="input-dark" placeholder="+56 9 XXXX XXXX" />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick=${function() { setStep(1); }} className="flex-1 border border-white/10 text-gray-300 font-medium py-2.5 rounded-lg transition-colors hover:bg-white/5">Atras</button>
+                <button type="submit" className="flex-1 btn-primary py-2.5">Continuar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>`;
+
+      // Step 3: Account creation
       return html`<div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
         <${BackgroundBeams} />
         <${FloatingOrbs} />
@@ -2402,7 +2854,7 @@
               </div>
               ${error && html`<p className="text-red-400 text-sm" role="alert">${error}</p>`}
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick=${function() { setStep(1); }} className="flex-1 border border-white/10 text-gray-300 font-medium py-2.5 rounded-lg transition-colors hover:bg-white/5">Atras</button>
+                <button type="button" onClick=${function() { setStep(2); }} className="flex-1 border border-white/10 text-gray-300 font-medium py-2.5 rounded-lg transition-colors hover:bg-white/5">Atras</button>
                 <button type="submit" disabled=${loading} className="flex-1 btn-primary py-2.5 flex items-center justify-center">
                   ${loading ? html`<${Spinner} className="h-5 w-5" />` : 'Registrar Restaurante'}
                 </button>

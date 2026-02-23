@@ -7,7 +7,18 @@ const referralService = new ReferralService();
 
 export class RestaurantService {
   async register(data: RegisterRestaurantInput & { ownerId: string }) {
-    const { name, ownerId, referralCode } = data;
+    const { name, ownerId, referralCode, city, numLocations, currentPos, deliveryPct, ownerWhatsapp, ownerEmail } = data;
+
+    const restaurantFields = {
+      name,
+      ownerId,
+      city,
+      numLocations,
+      currentPos,
+      deliveryPct,
+      ownerWhatsapp,
+      ownerEmail,
+    };
 
     if (referralCode) {
       const code = await prisma.referralCode.findUnique({
@@ -23,7 +34,7 @@ export class RestaurantService {
       }
 
       const restaurant = await prisma.restaurant.create({
-        data: { name, ownerId },
+        data: restaurantFields,
       });
 
       const referral = await referralService.createReferral(
@@ -36,7 +47,7 @@ export class RestaurantService {
     }
 
     const restaurant = await prisma.restaurant.create({
-      data: { name, ownerId },
+      data: restaurantFields,
     });
 
     return { restaurant };
@@ -52,6 +63,8 @@ export class RestaurantService {
           select: {
             id: true,
             status: true,
+            scoreTotal: true,
+            pipelineStatus: true,
             createdAt: true,
             referralCode: {
               select: {

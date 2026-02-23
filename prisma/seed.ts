@@ -4,6 +4,8 @@ import {
   ReferralStatus,
   RewardStatus,
   RestaurantStatus,
+  PipelineStatus,
+  PipelineEventType,
 } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
@@ -22,12 +24,21 @@ function daysFromNow(n: number): Date {
   return d;
 }
 
+function hoursAfter(base: Date, h: number): Date {
+  return new Date(base.getTime() + h * 3_600_000);
+}
+
+function minutesAfter(base: Date, m: number): Date {
+  return new Date(base.getTime() + m * 60_000);
+}
+
 function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
 async function main() {
   // Clean slate
+  await prisma.pipelineEvent.deleteMany();
   await prisma.reward.deleteMany();
   await prisma.referral.deleteMany();
   await prisma.restaurant.deleteMany();
@@ -131,57 +142,269 @@ async function main() {
     referralCode?: string;
     refStatus?: ReferralStatus;
     refDaysAgo?: number;
+    // Restaurant v2 fields
+    city: string;
+    numLocations: number;
+    currentPos: string;
+    deliveryPct: number;
+    ownerWhatsapp: string;
+    // Pipeline v2 mapping
+    pipelineStatus?: PipelineStatus;
+    // Scoring v2
+    scoreFit?: number;
+    scoreIntent?: number;
+    scoreEngage?: number;
+    // Engagement signals v2
+    usedCalculator?: boolean;
+    usedDiagnostic?: boolean;
+    requestedDemo?: boolean;
+    fromMetaAd?: boolean;
+    respondedWa?: boolean;
+    openedMessages?: number;
+    responseTimeMin?: number;
   }
 
   const restaurantsData: RestEntry[] = [
-    // Alice referrals (6)
-    { name: 'Tacos El Patron', ownerEmail: 'bob@example.com', status: RestaurantStatus.ACTIVE, referralCode: 'JUSTO-ALICE1', refStatus: ReferralStatus.REWARDED, refDaysAgo: 75 },
-    { name: 'Sushi Tokio Express', ownerEmail: 'david@example.com', status: RestaurantStatus.ACTIVE, referralCode: 'JUSTO-ALICE1', refStatus: ReferralStatus.REWARDED, refDaysAgo: 60 },
-    { name: 'Cafe La Esquina', ownerEmail: 'elena@example.com', status: RestaurantStatus.ACTIVE, referralCode: 'JUSTO-ALICE1', refStatus: ReferralStatus.QUALIFIED, refDaysAgo: 30 },
-    { name: 'Pizzeria Napoli', ownerEmail: 'fernando@example.com', status: RestaurantStatus.PENDING, referralCode: 'JUSTO-ALICE1', refStatus: ReferralStatus.PENDING, refDaysAgo: 5 },
-    { name: 'Mariscos El Puerto', ownerEmail: 'hugo@example.com', status: RestaurantStatus.PENDING, referralCode: 'JUSTO-ALICE1', refStatus: ReferralStatus.EXPIRED, refDaysAgo: 120 },
-    { name: 'La Vega Gourmet', ownerEmail: 'isabel@example.com', status: RestaurantStatus.ACTIVE, referralCode: 'JUSTO-ALICE1', refStatus: ReferralStatus.QUALIFIED, refDaysAgo: 18 },
+    // ── Alice referrals (6) ──────────────────────
+    {
+      name: 'Tacos El Patron', ownerEmail: 'bob@example.com',
+      status: RestaurantStatus.ACTIVE, referralCode: 'JUSTO-ALICE1',
+      refStatus: ReferralStatus.REWARDED, refDaysAgo: 75,
+      city: 'Santiago', numLocations: 2, currentPos: 'none', deliveryPct: 25, ownerWhatsapp: '+56912345601',
+      pipelineStatus: PipelineStatus.WON,
+      scoreFit: 32, scoreIntent: 24, scoreEngage: 26,
+      usedCalculator: true, usedDiagnostic: true, requestedDemo: true, respondedWa: true, openedMessages: 6, responseTimeMin: 8,
+    },
+    {
+      name: 'Sushi Tokio Express', ownerEmail: 'david@example.com',
+      status: RestaurantStatus.ACTIVE, referralCode: 'JUSTO-ALICE1',
+      refStatus: ReferralStatus.REWARDED, refDaysAgo: 60,
+      city: 'Santiago', numLocations: 3, currentPos: 'toteat', deliveryPct: 40, ownerWhatsapp: '+56912345602',
+      pipelineStatus: PipelineStatus.WON,
+      scoreFit: 36, scoreIntent: 22, scoreEngage: 24,
+      usedCalculator: true, usedDiagnostic: false, requestedDemo: true, respondedWa: true, openedMessages: 5, responseTimeMin: 12,
+    },
+    {
+      name: 'Cafe La Esquina', ownerEmail: 'elena@example.com',
+      status: RestaurantStatus.ACTIVE, referralCode: 'JUSTO-ALICE1',
+      refStatus: ReferralStatus.QUALIFIED, refDaysAgo: 30,
+      city: 'Valparaiso', numLocations: 1, currentPos: 'none', deliveryPct: 15, ownerWhatsapp: '+56912345603',
+      pipelineStatus: PipelineStatus.DEMO_SCHEDULED,
+      scoreFit: 22, scoreIntent: 18, scoreEngage: 16,
+      usedCalculator: true, usedDiagnostic: false, requestedDemo: true, respondedWa: true, openedMessages: 3, responseTimeMin: 25,
+    },
+    {
+      name: 'Pizzeria Napoli', ownerEmail: 'fernando@example.com',
+      status: RestaurantStatus.PENDING, referralCode: 'JUSTO-ALICE1',
+      refStatus: ReferralStatus.PENDING, refDaysAgo: 5,
+      city: 'Santiago', numLocations: 1, currentPos: 'none', deliveryPct: 30, ownerWhatsapp: '+56912345604',
+      pipelineStatus: PipelineStatus.PENDING,
+      scoreFit: 20, scoreIntent: 5, scoreEngage: 2,
+      usedCalculator: false, usedDiagnostic: false, requestedDemo: false, respondedWa: false, openedMessages: 1, responseTimeMin: undefined,
+    },
+    {
+      name: 'Mariscos El Puerto', ownerEmail: 'hugo@example.com',
+      status: RestaurantStatus.PENDING, referralCode: 'JUSTO-ALICE1',
+      refStatus: ReferralStatus.EXPIRED, refDaysAgo: 120,
+      city: 'Concepcion', numLocations: 1, currentPos: 'square', deliveryPct: 10, ownerWhatsapp: '+56912345605',
+      pipelineStatus: PipelineStatus.DEAD,
+      scoreFit: 14, scoreIntent: 5, scoreEngage: 2,
+      usedCalculator: false, usedDiagnostic: false, requestedDemo: false, respondedWa: false, openedMessages: 0, responseTimeMin: undefined,
+    },
+    {
+      name: 'La Vega Gourmet', ownerEmail: 'isabel@example.com',
+      status: RestaurantStatus.ACTIVE, referralCode: 'JUSTO-ALICE1',
+      refStatus: ReferralStatus.QUALIFIED, refDaysAgo: 18,
+      city: 'Santiago', numLocations: 2, currentPos: 'fudo', deliveryPct: 35, ownerWhatsapp: '+56912345606',
+      pipelineStatus: PipelineStatus.MEETING_HELD,
+      scoreFit: 30, scoreIntent: 20, scoreEngage: 22,
+      usedCalculator: true, usedDiagnostic: true, requestedDemo: true, respondedWa: true, openedMessages: 5, responseTimeMin: 10,
+    },
 
-    // Bob referrals (4)
-    { name: 'Birria Don Caro', ownerEmail: 'carol@example.com', status: RestaurantStatus.ACTIVE, referralCode: 'JUSTO-ROBER1', refStatus: ReferralStatus.REWARDED, refDaysAgo: 45 },
-    { name: 'Comedor Casero Gaby', ownerEmail: 'gabriela@example.com', status: RestaurantStatus.ACTIVE, referralCode: 'JUSTO-ROBER1', refStatus: ReferralStatus.QUALIFIED, refDaysAgo: 20 },
-    { name: 'Empanadas La Tia', ownerEmail: 'karen@example.com', status: RestaurantStatus.PENDING, referralCode: 'JUSTO-ROBER1', refStatus: ReferralStatus.PENDING, refDaysAgo: 3 },
-    { name: 'Wok Express', ownerEmail: 'nicolas@example.com', status: RestaurantStatus.ACTIVE, referralCode: 'JUSTO-ROBER1', refStatus: ReferralStatus.REWARDED, refDaysAgo: 55 },
+    // ── Bob referrals (4) ────────────────────────
+    {
+      name: 'Birria Don Caro', ownerEmail: 'carol@example.com',
+      status: RestaurantStatus.ACTIVE, referralCode: 'JUSTO-ROBER1',
+      refStatus: ReferralStatus.REWARDED, refDaysAgo: 45,
+      city: 'Santiago', numLocations: 1, currentPos: 'none', deliveryPct: 20, ownerWhatsapp: '+56912345607',
+      pipelineStatus: PipelineStatus.WON,
+      scoreFit: 28, scoreIntent: 20, scoreEngage: 22,
+      usedCalculator: true, usedDiagnostic: false, requestedDemo: true, respondedWa: true, openedMessages: 4, responseTimeMin: 15,
+    },
+    {
+      name: 'Comedor Casero Gaby', ownerEmail: 'gabriela@example.com',
+      status: RestaurantStatus.ACTIVE, referralCode: 'JUSTO-ROBER1',
+      refStatus: ReferralStatus.QUALIFIED, refDaysAgo: 20,
+      city: 'Temuco', numLocations: 1, currentPos: 'none', deliveryPct: 5, ownerWhatsapp: '+56912345608',
+      pipelineStatus: PipelineStatus.DEMO_SCHEDULED,
+      scoreFit: 18, scoreIntent: 15, scoreEngage: 14,
+      usedCalculator: false, usedDiagnostic: true, requestedDemo: true, respondedWa: true, openedMessages: 3, responseTimeMin: 35,
+    },
+    {
+      name: 'Empanadas La Tia', ownerEmail: 'karen@example.com',
+      status: RestaurantStatus.PENDING, referralCode: 'JUSTO-ROBER1',
+      refStatus: ReferralStatus.PENDING, refDaysAgo: 3,
+      city: 'Santiago', numLocations: 1, currentPos: 'none', deliveryPct: 45, ownerWhatsapp: '+56912345609',
+      pipelineStatus: PipelineStatus.PENDING,
+      scoreFit: 24, scoreIntent: 8, scoreEngage: 3,
+      usedCalculator: true, usedDiagnostic: false, requestedDemo: false, respondedWa: false, openedMessages: 0, responseTimeMin: undefined,
+    },
+    {
+      name: 'Wok Express', ownerEmail: 'nicolas@example.com',
+      status: RestaurantStatus.ACTIVE, referralCode: 'JUSTO-ROBER1',
+      refStatus: ReferralStatus.REWARDED, refDaysAgo: 55,
+      city: 'Antofagasta', numLocations: 4, currentPos: 'toteat', deliveryPct: 55, ownerWhatsapp: '+56912345610',
+      pipelineStatus: PipelineStatus.WON,
+      scoreFit: 38, scoreIntent: 26, scoreEngage: 28,
+      usedCalculator: true, usedDiagnostic: true, requestedDemo: true, respondedWa: true, openedMessages: 8, responseTimeMin: 5,
+    },
 
-    // Carol referrals (3)
-    { name: 'Antojitos Hugo', ownerEmail: 'hugo@example.com', status: RestaurantStatus.ACTIVE, referralCode: 'JUSTO-CAROL1', refStatus: ReferralStatus.REWARDED, refDaysAgo: 35 },
-    { name: 'Sabor Criollo', ownerEmail: 'olivia@example.com', status: RestaurantStatus.ACTIVE, referralCode: 'JUSTO-CAROL1', refStatus: ReferralStatus.QUALIFIED, refDaysAgo: 12 },
-    { name: 'Pollo Asado Don Luis', ownerEmail: 'luis@example.com', status: RestaurantStatus.SUSPENDED, referralCode: 'JUSTO-CAROL1', refStatus: ReferralStatus.EXPIRED, refDaysAgo: 100 },
+    // ── Carol referrals (3) ──────────────────────
+    {
+      name: 'Antojitos Hugo', ownerEmail: 'hugo@example.com',
+      status: RestaurantStatus.ACTIVE, referralCode: 'JUSTO-CAROL1',
+      refStatus: ReferralStatus.REWARDED, refDaysAgo: 35,
+      city: 'Santiago', numLocations: 2, currentPos: 'fudo', deliveryPct: 30, ownerWhatsapp: '+56912345611',
+      pipelineStatus: PipelineStatus.WON,
+      scoreFit: 30, scoreIntent: 22, scoreEngage: 24,
+      usedCalculator: true, usedDiagnostic: true, requestedDemo: true, respondedWa: true, openedMessages: 6, responseTimeMin: 10,
+    },
+    {
+      name: 'Sabor Criollo', ownerEmail: 'olivia@example.com',
+      status: RestaurantStatus.ACTIVE, referralCode: 'JUSTO-CAROL1',
+      refStatus: ReferralStatus.QUALIFIED, refDaysAgo: 12,
+      city: 'Valparaiso', numLocations: 1, currentPos: 'none', deliveryPct: 20, ownerWhatsapp: '+56912345612',
+      pipelineStatus: PipelineStatus.LOST,
+      scoreFit: 18, scoreIntent: 14, scoreEngage: 10,
+      usedCalculator: false, usedDiagnostic: false, requestedDemo: true, respondedWa: true, openedMessages: 2, responseTimeMin: 45,
+    },
+    {
+      name: 'Pollo Asado Don Luis', ownerEmail: 'luis@example.com',
+      status: RestaurantStatus.SUSPENDED, referralCode: 'JUSTO-CAROL1',
+      refStatus: ReferralStatus.EXPIRED, refDaysAgo: 100,
+      city: 'Concepcion', numLocations: 1, currentPos: 'otro', deliveryPct: 15, ownerWhatsapp: '+56912345613',
+      pipelineStatus: PipelineStatus.DEAD,
+      scoreFit: 12, scoreIntent: 4, scoreEngage: 3,
+      usedCalculator: false, usedDiagnostic: false, requestedDemo: false, respondedWa: false, openedMessages: 1, responseTimeMin: undefined,
+    },
 
-    // David referrals (2)
-    { name: 'Taqueria El Sol', ownerEmail: 'pablo@example.com', status: RestaurantStatus.ACTIVE, referralCode: 'JUSTO-DAVID1', refStatus: ReferralStatus.REWARDED, refDaysAgo: 40 },
-    { name: 'Cevicheria Peruana', ownerEmail: 'rosa@example.com', status: RestaurantStatus.PENDING, referralCode: 'JUSTO-DAVID1', refStatus: ReferralStatus.PENDING, refDaysAgo: 7 },
+    // ── David referrals (2) ──────────────────────
+    {
+      name: 'Taqueria El Sol', ownerEmail: 'pablo@example.com',
+      status: RestaurantStatus.ACTIVE, referralCode: 'JUSTO-DAVID1',
+      refStatus: ReferralStatus.REWARDED, refDaysAgo: 40,
+      city: 'Santiago', numLocations: 3, currentPos: 'toteat', deliveryPct: 50, ownerWhatsapp: '+56912345614',
+      pipelineStatus: PipelineStatus.WON,
+      scoreFit: 35, scoreIntent: 25, scoreEngage: 26,
+      usedCalculator: true, usedDiagnostic: true, requestedDemo: true, respondedWa: true, openedMessages: 7, responseTimeMin: 7,
+    },
+    {
+      name: 'Cevicheria Peruana', ownerEmail: 'rosa@example.com',
+      status: RestaurantStatus.PENDING, referralCode: 'JUSTO-DAVID1',
+      refStatus: ReferralStatus.PENDING, refDaysAgo: 7,
+      city: 'Temuco', numLocations: 1, currentPos: 'none', deliveryPct: 10, ownerWhatsapp: '+56912345615',
+      pipelineStatus: PipelineStatus.PENDING,
+      scoreFit: 15, scoreIntent: 3, scoreEngage: 1,
+      usedCalculator: false, usedDiagnostic: false, requestedDemo: false, respondedWa: false, openedMessages: 0, responseTimeMin: undefined,
+    },
 
-    // Elena referrals (2)
-    { name: 'BBQ House Santiago', ownerEmail: 'sergio@example.com', status: RestaurantStatus.ACTIVE, referralCode: 'JUSTO-ELENA1', refStatus: ReferralStatus.QUALIFIED, refDaysAgo: 15 },
-    { name: 'Pasteleria Dulce Hogar', ownerEmail: 'tamara@example.com', status: RestaurantStatus.ACTIVE, referralCode: 'JUSTO-ELENA1', refStatus: ReferralStatus.REWARDED, refDaysAgo: 50 },
+    // ── Elena referrals (2) ──────────────────────
+    {
+      name: 'BBQ House Santiago', ownerEmail: 'sergio@example.com',
+      status: RestaurantStatus.ACTIVE, referralCode: 'JUSTO-ELENA1',
+      refStatus: ReferralStatus.QUALIFIED, refDaysAgo: 15,
+      city: 'Santiago', numLocations: 2, currentPos: 'square', deliveryPct: 35, ownerWhatsapp: '+56912345616',
+      pipelineStatus: PipelineStatus.NO_SHOW,
+      scoreFit: 26, scoreIntent: 16, scoreEngage: 8,
+      usedCalculator: true, usedDiagnostic: false, requestedDemo: true, respondedWa: false, openedMessages: 2, responseTimeMin: 90,
+    },
+    {
+      name: 'Pasteleria Dulce Hogar', ownerEmail: 'tamara@example.com',
+      status: RestaurantStatus.ACTIVE, referralCode: 'JUSTO-ELENA1',
+      refStatus: ReferralStatus.REWARDED, refDaysAgo: 50,
+      city: 'Santiago', numLocations: 1, currentPos: 'none', deliveryPct: 5, ownerWhatsapp: '+56912345617',
+      pipelineStatus: PipelineStatus.WON,
+      scoreFit: 24, scoreIntent: 20, scoreEngage: 22,
+      usedCalculator: true, usedDiagnostic: false, requestedDemo: true, respondedWa: true, openedMessages: 4, responseTimeMin: 18,
+    },
 
-    // Admin referrals (3)
-    { name: 'La Cocina de Alice', ownerEmail: 'alice@example.com', status: RestaurantStatus.ACTIVE, referralCode: 'JUSTO-ADMIN1', refStatus: ReferralStatus.REWARDED, refDaysAgo: 90 },
-    { name: 'Arepas Venezolanas', ownerEmail: 'ulises@example.com', status: RestaurantStatus.ACTIVE, referralCode: 'JUSTO-ADMIN1', refStatus: ReferralStatus.QUALIFIED, refDaysAgo: 25 },
-    { name: 'Burger Lab', ownerEmail: 'walter@example.com', status: RestaurantStatus.PENDING, referralCode: 'JUSTO-ADMIN1', refStatus: ReferralStatus.PENDING, refDaysAgo: 2 },
+    // ── Admin referrals (3) ──────────────────────
+    {
+      name: 'La Cocina de Alice', ownerEmail: 'alice@example.com',
+      status: RestaurantStatus.ACTIVE, referralCode: 'JUSTO-ADMIN1',
+      refStatus: ReferralStatus.REWARDED, refDaysAgo: 90,
+      city: 'Santiago', numLocations: 6, currentPos: 'toteat', deliveryPct: 60, ownerWhatsapp: '+56912345618',
+      pipelineStatus: PipelineStatus.WON,
+      scoreFit: 40, scoreIntent: 28, scoreEngage: 27,
+      usedCalculator: true, usedDiagnostic: true, requestedDemo: true, respondedWa: true, openedMessages: 7, responseTimeMin: 3,
+    },
+    {
+      name: 'Arepas Venezolanas', ownerEmail: 'ulises@example.com',
+      status: RestaurantStatus.ACTIVE, referralCode: 'JUSTO-ADMIN1',
+      refStatus: ReferralStatus.QUALIFIED, refDaysAgo: 25,
+      city: 'Antofagasta', numLocations: 1, currentPos: 'none', deliveryPct: 25, ownerWhatsapp: '+56912345619',
+      pipelineStatus: PipelineStatus.MEETING_HELD,
+      scoreFit: 22, scoreIntent: 18, scoreEngage: 20,
+      usedCalculator: true, usedDiagnostic: false, requestedDemo: true, respondedWa: true, openedMessages: 4, responseTimeMin: 15,
+    },
+    {
+      name: 'Burger Lab', ownerEmail: 'walter@example.com',
+      status: RestaurantStatus.PENDING, referralCode: 'JUSTO-ADMIN1',
+      refStatus: ReferralStatus.PENDING, refDaysAgo: 2,
+      city: 'Santiago', numLocations: 2, currentPos: 'fudo', deliveryPct: 45, ownerWhatsapp: '+56912345620',
+      pipelineStatus: PipelineStatus.PENDING,
+      scoreFit: 28, scoreIntent: 6, scoreEngage: 2,
+      usedCalculator: false, usedDiagnostic: false, requestedDemo: false, respondedWa: false, openedMessages: 1, responseTimeMin: undefined,
+    },
 
-    // Jorge referral (1)
-    { name: 'Parrilla Don Matias', ownerEmail: 'andres@example.com', status: RestaurantStatus.ACTIVE, referralCode: 'JUSTO-JORGE1', refStatus: ReferralStatus.QUALIFIED, refDaysAgo: 10 },
+    // ── Jorge referral (1) ───────────────────────
+    {
+      name: 'Parrilla Don Matias', ownerEmail: 'andres@example.com',
+      status: RestaurantStatus.ACTIVE, referralCode: 'JUSTO-JORGE1',
+      refStatus: ReferralStatus.QUALIFIED, refDaysAgo: 10,
+      city: 'Santiago', numLocations: 1, currentPos: 'none', deliveryPct: 15, ownerWhatsapp: '+56912345621',
+      pipelineStatus: PipelineStatus.DEMO_SCHEDULED,
+      scoreFit: 20, scoreIntent: 16, scoreEngage: 15,
+      usedCalculator: true, usedDiagnostic: false, requestedDemo: true, respondedWa: true, openedMessages: 3, responseTimeMin: 20,
+    },
 
-    // Karen referral (1)
-    { name: 'Helados Artesanales', ownerEmail: 'beatriz@example.com', status: RestaurantStatus.ACTIVE, referralCode: 'JUSTO-KAREN1', refStatus: ReferralStatus.REWARDED, refDaysAgo: 38 },
+    // ── Karen referral (1) ───────────────────────
+    {
+      name: 'Helados Artesanales', ownerEmail: 'beatriz@example.com',
+      status: RestaurantStatus.ACTIVE, referralCode: 'JUSTO-KAREN1',
+      refStatus: ReferralStatus.REWARDED, refDaysAgo: 38,
+      city: 'Valparaiso', numLocations: 3, currentPos: 'toteat', deliveryPct: 40, ownerWhatsapp: '+56912345622',
+      pipelineStatus: PipelineStatus.WON,
+      scoreFit: 34, scoreIntent: 24, scoreEngage: 25,
+      usedCalculator: true, usedDiagnostic: true, requestedDemo: true, respondedWa: true, openedMessages: 5, responseTimeMin: 9,
+    },
 
-    // Luis referral (1)
-    { name: 'Ramen Ichiban', ownerEmail: 'cristian@example.com', status: RestaurantStatus.PENDING, referralCode: 'JUSTO-LUIS01', refStatus: ReferralStatus.PENDING, refDaysAgo: 1 },
+    // ── Luis referral (1) ────────────────────────
+    {
+      name: 'Ramen Ichiban', ownerEmail: 'cristian@example.com',
+      status: RestaurantStatus.PENDING, referralCode: 'JUSTO-LUIS01',
+      refStatus: ReferralStatus.PENDING, refDaysAgo: 1,
+      city: 'Santiago', numLocations: 1, currentPos: 'none', deliveryPct: 30, ownerWhatsapp: '+56912345623',
+      pipelineStatus: PipelineStatus.PENDING,
+      scoreFit: 18, scoreIntent: 2, scoreEngage: 0,
+      usedCalculator: false, usedDiagnostic: false, requestedDemo: false, respondedWa: false, openedMessages: 0, responseTimeMin: undefined,
+    },
 
-    // Direct registrations (no referral)
-    { name: 'Sandwicheria El Rapido', ownerEmail: 'daniela@example.com', status: RestaurantStatus.ACTIVE },
-    { name: 'Jugos Naturales Vida', ownerEmail: 'ximena@example.com', status: RestaurantStatus.CANCELLED },
+    // ── Direct registrations (no referral) ───────
+    {
+      name: 'Sandwicheria El Rapido', ownerEmail: 'daniela@example.com',
+      status: RestaurantStatus.ACTIVE,
+      city: 'Santiago', numLocations: 2, currentPos: 'square', deliveryPct: 50, ownerWhatsapp: '+56912345624',
+    },
+    {
+      name: 'Jugos Naturales Vida', ownerEmail: 'ximena@example.com',
+      status: RestaurantStatus.CANCELLED,
+      city: 'Temuco', numLocations: 1, currentPos: 'none', deliveryPct: 0, ownerWhatsapp: '+56912345625',
+    },
   ];
 
   const restaurants: Record<string, { id: string; name: string; ownerId: string }> = {};
-  const referrals: Record<string, { id: string }> = {};
+  const referrals: Record<string, { id: string; createdAt: Date; qualifiedAt?: Date }> = {};
 
   for (const r of restaurantsData) {
     const rest = await prisma.restaurant.create({
@@ -190,31 +413,242 @@ async function main() {
         ownerId: users[r.ownerEmail].id,
         status: r.status,
         createdAt: daysAgo(r.refDaysAgo ?? Math.floor(Math.random() * 60) + 10),
+        // Restaurant v2 fields
+        city: r.city,
+        numLocations: r.numLocations,
+        currentPos: r.currentPos,
+        deliveryPct: r.deliveryPct,
+        ownerWhatsapp: r.ownerWhatsapp,
+        ownerEmail: r.ownerEmail,
       },
     });
     restaurants[r.name] = rest;
 
     if (r.referralCode && r.refStatus != null && r.refDaysAgo != null) {
       const createdAt = daysAgo(r.refDaysAgo);
+      const qualifiedAt = r.refStatus !== ReferralStatus.PENDING
+        ? new Date(createdAt.getTime() + 3 * 86_400_000)
+        : undefined;
+      const rewardedAt = r.refStatus === ReferralStatus.REWARDED
+        ? new Date(createdAt.getTime() + 5 * 86_400_000)
+        : undefined;
+
+      // Compute sdrContactedAt: qualifiedAt + random 3-15 minutes (for non-PENDING)
+      const sdrContactedAt = qualifiedAt
+        ? minutesAfter(qualifiedAt, 3 + Math.floor(Math.random() * 13))
+        : undefined;
+
+      // Compute pipeline timestamps based on pipeline status
+      const ps = r.pipelineStatus ?? PipelineStatus.PENDING;
+      const needsDemo = (
+        ps === PipelineStatus.DEMO_SCHEDULED || ps === PipelineStatus.MEETING_HELD ||
+        ps === PipelineStatus.WON || ps === PipelineStatus.LOST || ps === PipelineStatus.NO_SHOW
+      );
+      const needsMeeting = (
+        ps === PipelineStatus.MEETING_HELD || ps === PipelineStatus.WON || ps === PipelineStatus.LOST
+      );
+
+      const demoScheduledAt = needsDemo && qualifiedAt
+        ? hoursAfter(qualifiedAt, 24 + Math.floor(Math.random() * 48))
+        : undefined;
+      const meetingHeldAt = needsMeeting && demoScheduledAt
+        ? hoursAfter(demoScheduledAt, 48 + Math.floor(Math.random() * 72))
+        : undefined;
+
+      const scoreTotal = (r.scoreFit ?? 0) + (r.scoreIntent ?? 0) + (r.scoreEngage ?? 0);
+
       const ref = await prisma.referral.create({
         data: {
           referralCodeId: codes[r.referralCode].id,
           referredRestaurantId: rest.id,
           status: r.refStatus,
           createdAt,
-          qualifiedAt: r.refStatus !== ReferralStatus.PENDING
-            ? new Date(createdAt.getTime() + 3 * 86_400_000)
-            : undefined,
-          rewardedAt: r.refStatus === ReferralStatus.REWARDED
-            ? new Date(createdAt.getTime() + 5 * 86_400_000)
-            : undefined,
+          qualifiedAt,
+          rewardedAt,
+          // Scoring v2
+          scoreFit: r.scoreFit ?? null,
+          scoreIntent: r.scoreIntent ?? null,
+          scoreEngage: r.scoreEngage ?? null,
+          scoreTotal: scoreTotal > 0 ? scoreTotal : null,
+          scoredAt: scoreTotal > 0 ? createdAt : null,
+          // Engagement signals v2
+          usedCalculator: r.usedCalculator ?? false,
+          usedDiagnostic: r.usedDiagnostic ?? false,
+          requestedDemo: r.requestedDemo ?? false,
+          fromMetaAd: r.fromMetaAd ?? false,
+          respondedWa: r.respondedWa ?? false,
+          openedMessages: r.openedMessages ?? 0,
+          responseTimeMin: r.responseTimeMin ?? null,
+          // Pipeline v2
+          pipelineStatus: ps,
+          demoScheduledAt,
+          meetingHeldAt,
+          meetingOutcome: ps === PipelineStatus.WON ? 'Cerrado - contrato firmado'
+            : ps === PipelineStatus.LOST ? 'No le convencio el precio'
+            : ps === PipelineStatus.NO_SHOW ? 'No se presento a la demo'
+            : null,
+          // SLA tracking
+          sdrContactedAt,
         },
       });
-      referrals[r.name] = ref;
+      referrals[r.name] = { id: ref.id, createdAt, qualifiedAt };
     }
   }
   console.log(`Restaurants created: ${restaurantsData.length}`);
   console.log(`Referrals created: ${Object.keys(referrals).length}`);
+
+  // ══════════════════════════════════════════════════════════
+  //  PIPELINE EVENTS (for non-PENDING referrals)
+  // ══════════════════════════════════════════════════════════
+  let eventCount = 0;
+
+  for (const r of restaurantsData) {
+    if (!r.referralCode || r.refStatus == null || r.refDaysAgo == null) continue;
+    const ps = r.pipelineStatus ?? PipelineStatus.PENDING;
+    if (ps === PipelineStatus.PENDING) continue;
+
+    const refRecord = referrals[r.name];
+    if (!refRecord) continue;
+
+    const { id: referralId, createdAt, qualifiedAt } = refRecord;
+    if (!qualifiedAt) continue;
+
+    const events: Array<{
+      eventType: PipelineEventType;
+      fromStatus?: PipelineStatus;
+      toStatus?: PipelineStatus;
+      note?: string;
+      createdAt: Date;
+    }> = [];
+
+    // Event 1: AUTO_QUALIFIED — PENDING → QUALIFIED
+    events.push({
+      eventType: PipelineEventType.AUTO_QUALIFIED,
+      fromStatus: PipelineStatus.PENDING,
+      toStatus: PipelineStatus.QUALIFIED,
+      note: 'Lead auto-calificado por score',
+      createdAt: qualifiedAt,
+    });
+
+    // Event 2: CONTACT_ATTEMPT — SDR contacted
+    events.push({
+      eventType: PipelineEventType.CONTACT_ATTEMPT,
+      note: 'SDR contacto por WhatsApp',
+      createdAt: minutesAfter(qualifiedAt, 5 + Math.floor(Math.random() * 10)),
+    });
+
+    // Event 3: SCORE_UPDATE
+    events.push({
+      eventType: PipelineEventType.SCORE_UPDATE,
+      note: `Score actualizado: fit=${r.scoreFit} intent=${r.scoreIntent} engage=${r.scoreEngage}`,
+      createdAt: minutesAfter(qualifiedAt, 15 + Math.floor(Math.random() * 30)),
+    });
+
+    const needsDemo = (
+      ps === PipelineStatus.DEMO_SCHEDULED || ps === PipelineStatus.MEETING_HELD ||
+      ps === PipelineStatus.WON || ps === PipelineStatus.LOST || ps === PipelineStatus.NO_SHOW
+    );
+
+    if (needsDemo) {
+      // Event 4: STATUS_CHANGE — QUALIFIED → DEMO_SCHEDULED
+      events.push({
+        eventType: PipelineEventType.STATUS_CHANGE,
+        fromStatus: PipelineStatus.QUALIFIED,
+        toStatus: PipelineStatus.DEMO_SCHEDULED,
+        note: 'Demo agendada con el restaurante',
+        createdAt: hoursAfter(qualifiedAt, 24 + Math.floor(Math.random() * 24)),
+      });
+
+      // Event 5: DEMO_SCHEDULED event
+      events.push({
+        eventType: PipelineEventType.DEMO_SCHEDULED,
+        note: 'Demo confirmada',
+        createdAt: hoursAfter(qualifiedAt, 26 + Math.floor(Math.random() * 24)),
+      });
+    }
+
+    const needsMeeting = (
+      ps === PipelineStatus.MEETING_HELD || ps === PipelineStatus.WON || ps === PipelineStatus.LOST
+    );
+
+    if (needsMeeting) {
+      // Event 6: STATUS_CHANGE — DEMO_SCHEDULED → MEETING_HELD
+      events.push({
+        eventType: PipelineEventType.STATUS_CHANGE,
+        fromStatus: PipelineStatus.DEMO_SCHEDULED,
+        toStatus: PipelineStatus.MEETING_HELD,
+        note: 'Reunion realizada con el dueno',
+        createdAt: hoursAfter(qualifiedAt, 96 + Math.floor(Math.random() * 48)),
+      });
+
+      // Event 7: MEETING_HELD event
+      events.push({
+        eventType: PipelineEventType.MEETING_HELD,
+        note: 'Reunion completada exitosamente',
+        createdAt: hoursAfter(qualifiedAt, 98 + Math.floor(Math.random() * 48)),
+      });
+    }
+
+    if (ps === PipelineStatus.NO_SHOW) {
+      // Event: DEMO_SCHEDULED → NO_SHOW
+      events.push({
+        eventType: PipelineEventType.STATUS_CHANGE,
+        fromStatus: PipelineStatus.DEMO_SCHEDULED,
+        toStatus: PipelineStatus.NO_SHOW,
+        note: 'Restaurante no se presento a la demo programada',
+        createdAt: hoursAfter(qualifiedAt, 72 + Math.floor(Math.random() * 24)),
+      });
+    }
+
+    if (ps === PipelineStatus.WON) {
+      // Event: MEETING_HELD → WON
+      events.push({
+        eventType: PipelineEventType.STATUS_CHANGE,
+        fromStatus: PipelineStatus.MEETING_HELD,
+        toStatus: PipelineStatus.WON,
+        note: 'Contrato firmado - restaurante integrado',
+        createdAt: hoursAfter(qualifiedAt, 144 + Math.floor(Math.random() * 48)),
+      });
+    }
+
+    if (ps === PipelineStatus.LOST) {
+      // Event: MEETING_HELD → LOST
+      events.push({
+        eventType: PipelineEventType.STATUS_CHANGE,
+        fromStatus: PipelineStatus.MEETING_HELD,
+        toStatus: PipelineStatus.LOST,
+        note: 'Restaurante decidio no continuar - precio',
+        createdAt: hoursAfter(qualifiedAt, 120 + Math.floor(Math.random() * 48)),
+      });
+    }
+
+    if (ps === PipelineStatus.DEAD) {
+      // Event: QUALIFIED → DEAD (expired, never responded)
+      events.push({
+        eventType: PipelineEventType.STATUS_CHANGE,
+        fromStatus: PipelineStatus.QUALIFIED,
+        toStatus: PipelineStatus.DEAD,
+        note: 'Lead sin respuesta - marcado como muerto',
+        createdAt: hoursAfter(qualifiedAt, 336 + Math.floor(Math.random() * 168)),
+      });
+    }
+
+    // Persist all events for this referral
+    for (const evt of events) {
+      await prisma.pipelineEvent.create({
+        data: {
+          referralId,
+          eventType: evt.eventType,
+          fromStatus: evt.fromStatus ?? null,
+          toStatus: evt.toStatus ?? null,
+          note: evt.note ?? null,
+          createdAt: evt.createdAt,
+        },
+      });
+      eventCount++;
+    }
+  }
+  console.log(`Pipeline events created: ${eventCount}`);
 
   // ══════════════════════════════════════════════════════════
   //  REWARDS (~44)
@@ -324,7 +758,6 @@ async function main() {
       continue;
     }
 
-    const now = new Date();
     await prisma.reward.create({
       data: {
         referralId: ref.id,
@@ -351,13 +784,15 @@ async function main() {
   const restCount = await prisma.restaurant.count();
   const refCount = await prisma.referral.count();
   const rwCount = await prisma.reward.count();
+  const evtCount = await prisma.pipelineEvent.count();
 
   console.log('\n=== Seed Summary ===');
-  console.log(`Users:          ${userCount} (2 admins + ${userCount - 2} users)`);
-  console.log(`Referral codes: ${codeCount}`);
-  console.log(`Restaurants:    ${restCount}`);
-  console.log(`Referrals:      ${refCount}`);
-  console.log(`Rewards:        ${rwCount}`);
+  console.log(`Users:           ${userCount} (2 admins + ${userCount - 2} users)`);
+  console.log(`Referral codes:  ${codeCount}`);
+  console.log(`Restaurants:     ${restCount}`);
+  console.log(`Referrals:       ${refCount}`);
+  console.log(`Rewards:         ${rwCount}`);
+  console.log(`Pipeline events: ${evtCount}`);
   console.log('\nLogin credentials:');
   console.log('  Admin:     admin@justo.mx / admin123');
   console.log('  Soporte:   soporte@justo.mx / admin123');
