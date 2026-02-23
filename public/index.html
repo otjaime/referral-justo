@@ -355,7 +355,27 @@
       var score = props.score;
       if (score == null) return html`<span className="text-xs text-gray-600">--</span>`;
       var cls = score >= 60 ? 'text-emerald-400' : score >= 40 ? 'text-yellow-400' : 'text-red-400';
-      return html`<span className=${'text-sm font-bold ' + cls}>${score}</span>`;
+      var hasSub = props.fit != null || props.intent != null || props.engage != null;
+      if (!hasSub) return html`<span className=${'text-sm font-bold ' + cls}>${score}</span>`;
+      return html`<div className="relative group inline-block">
+        <span className=${'text-sm font-bold cursor-default ' + cls}>${score}</span>
+        <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 hidden group-hover:block z-50 w-44 bg-gray-900 border border-white/10 rounded-lg p-3 shadow-xl">
+          <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Desglose</p>
+          ${[
+            { label: 'FIT', value: props.fit || 0, color: 'bg-blue-500' },
+            { label: 'INTENT', value: props.intent || 0, color: 'bg-purple-500' },
+            { label: 'ENGAGE', value: props.engage || 0, color: 'bg-amber-500' },
+          ].map(function(s) {
+            return html`<div key=${s.label} className="flex items-center gap-2 mb-1.5 last:mb-0">
+              <span className="text-[10px] text-gray-400 w-12">${s.label}</span>
+              <div className="flex-1 h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+                <div className=${s.color + ' h-full rounded-full'} style=${{ width: Math.min(s.value * 2.5, 100) + '%' }} />
+              </div>
+              <span className="text-[10px] text-gray-300 w-5 text-right">${s.value}</span>
+            </div>`;
+          })}
+        </div>
+      </div>`;
     }
 
     function Spinner(props) {
@@ -952,6 +972,11 @@
       var _ce = useState(''), codeError = _ce[0], setCodeError = _ce[1];
       var _ld = useState(false), loading = _ld[0], setLoading = _ld[1];
       var _e = useState(''), error = _e[0], setError = _e[1];
+      var _cy = useState(''), city = _cy[0], setCity = _cy[1];
+      var _nl = useState(''), numLocations = _nl[0], setNumLocations = _nl[1];
+      var _cp = useState(''), currentPos = _cp[0], setCurrentPos = _cp[1];
+      var _dp = useState(''), deliveryPct = _dp[0], setDeliveryPct = _dp[1];
+      var _wa = useState(''), whatsapp = _wa[0], setWhatsapp = _wa[1];
 
       useEffect(function() {
         if (!refCode || refCode.length < 4) { setCodeStatus(null); return; }
@@ -969,6 +994,11 @@
         setError(''); setLoading(true);
         var body = { name: name };
         if (refCode) body.referralCode = refCode;
+        if (city) body.city = city;
+        if (numLocations) body.numLocations = parseInt(numLocations, 10);
+        if (currentPos) body.currentPos = currentPos;
+        if (deliveryPct) body.deliveryPct = parseInt(deliveryPct, 10);
+        if (whatsapp) body.ownerWhatsapp = whatsapp;
         api('/restaurants/register', { method: 'POST', body: JSON.stringify(body) })
           .then(function() { toast.addToast('Restaurante registrado exitosamente!'); navigate('/'); })
           .catch(function(err) { setError(err.message); })
@@ -994,6 +1024,61 @@
               ${codeStatus === 'valid' && html`<p className="text-emerald-400 text-sm mt-1">Referido por ${referrerName}</p>`}
               ${codeStatus === 'invalid' && html`<p className="text-red-400 text-sm mt-1">${codeError}</p>`}
             </div>
+
+            <div className="border-t border-white/[0.06] pt-4 mt-4">
+              <p className="text-sm font-medium text-gray-400 mb-3">Datos del negocio <span className="text-gray-600">(opcional)</span></p>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Ciudad</label>
+                  <select value=${city} onChange=${function(e) { setCity(e.target.value); }} className="input-dark">
+                    <option value="">Selecciona tu ciudad</option>
+                    <option value="Santiago">Santiago</option>
+                    <option value="Valparaiso">Valparaiso</option>
+                    <option value="Concepcion">Concepcion</option>
+                    <option value="Antofagasta">Antofagasta</option>
+                    <option value="Temuco">Temuco</option>
+                    <option value="Otra">Otra</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Cuantos locales tienes?</label>
+                  <select value=${numLocations} onChange=${function(e) { setNumLocations(e.target.value); }} className="input-dark">
+                    <option value="">Selecciona</option>
+                    <option value="1">1 local</option>
+                    <option value="2">2-3 locales</option>
+                    <option value="4">4-5 locales</option>
+                    <option value="6">6+ locales</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Usas sistema POS actualmente?</label>
+                  <select value=${currentPos} onChange=${function(e) { setCurrentPos(e.target.value); }} className="input-dark">
+                    <option value="">Selecciona</option>
+                    <option value="none">No uso POS</option>
+                    <option value="toteat">Toteat</option>
+                    <option value="fudo">Fudo</option>
+                    <option value="square">Square</option>
+                    <option value="other">Otro</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Porcentaje de ventas por delivery?</label>
+                  <select value=${deliveryPct} onChange=${function(e) { setDeliveryPct(e.target.value); }} className="input-dark">
+                    <option value="">Selecciona</option>
+                    <option value="0">No hago delivery</option>
+                    <option value="10">Menos del 15%</option>
+                    <option value="20">15-30%</option>
+                    <option value="40">31-50%</option>
+                    <option value="60">Mas del 50%</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">WhatsApp</label>
+                  <input type="tel" value=${whatsapp} onInput=${function(e) { setWhatsapp(e.target.value); }} className="input-dark" placeholder="+56 9 XXXX XXXX" />
+                </div>
+              </div>
+            </div>
+
             ${error && html`<p className="text-red-400 text-sm">${error}</p>`}
             <button type="submit" disabled=${loading} className="w-full btn-primary py-2.5">
               ${loading ? html`<${Spinner} className="h-5 w-5" />` : 'Registrar Restaurante'}
@@ -1987,7 +2072,7 @@
                         <p className="text-xs text-gray-500">${ref && ref.email}</p>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-300">${rest && rest.name}</td>
-                      <td className="px-4 py-4 text-center"><${ScoreBadge} score=${r.scoreTotal} /></td>
+                      <td className="px-4 py-4 text-center"><${ScoreBadge} score=${r.scoreTotal} fit=${r.scoreFit} intent=${r.scoreIntent} engage=${r.scoreEngage} /></td>
                       <td className="px-4 py-4"><${PipelineBadge} status=${r.pipelineStatus} /></td>
                       <td className="px-4 py-4"><${StatusBadge} status=${r.status} /></td>
                       <td className="px-4 py-4 text-sm text-gray-400">${new Date(r.createdAt).toLocaleDateString('es-CL')}</td>
