@@ -262,9 +262,9 @@
       }, []);
 
       function login(userData, tokenStr) {
-        setUser(userData); setToken(tokenStr);
         localStorage.setItem('justo_token', tokenStr);
         localStorage.setItem('justo_user', JSON.stringify(userData));
+        setUser(userData); setToken(tokenStr);
       }
       function logout() {
         setUser(null); setToken(null);
@@ -642,9 +642,15 @@
       var _l = useState(true), loading = _l[0], setLoading = _l[1];
 
       useEffect(function() {
-        Promise.all([api('/referrals/my-code'), api('/referrals/sent'), api('/rewards'), api('/analytics/my-rank')])
-          .then(function(res) { setCode(res[0]); setSent(res[1]); setRewards(res[2]); setRank(res[3]); })
-          .catch(function(err) { toast.addToast('Error al cargar datos', 'error'); })
+        Promise.allSettled([api('/referrals/my-code'), api('/referrals/sent'), api('/rewards'), api('/analytics/my-rank')])
+          .then(function(results) {
+            if (results[0].status === 'fulfilled') setCode(results[0].value);
+            if (results[1].status === 'fulfilled') setSent(results[1].value);
+            if (results[2].status === 'fulfilled') setRewards(results[2].value);
+            if (results[3].status === 'fulfilled') setRank(results[3].value);
+            var failed = results.filter(function(r) { return r.status === 'rejected'; });
+            if (failed.length === results.length) toast.addToast('Error al cargar datos', 'error');
+          })
           .finally(function() { setLoading(false); });
       }, []);
 
@@ -852,9 +858,13 @@
       var _l = useState(true), loading = _l[0], setLoading = _l[1];
 
       useEffect(function() {
-        Promise.all([api('/referrals/sent'), api('/referrals/received')])
-          .then(function(res) { setSent(res[0]); setReceived(res[1]); })
-          .catch(function(err) { toast.addToast('Error al cargar referidos', 'error'); })
+        Promise.allSettled([api('/referrals/sent'), api('/referrals/received')])
+          .then(function(results) {
+            if (results[0].status === 'fulfilled') setSent(results[0].value);
+            if (results[1].status === 'fulfilled') setReceived(results[1].value);
+            var failed = results.filter(function(r) { return r.status === 'rejected'; });
+            if (failed.length === results.length) toast.addToast('Error al cargar referidos', 'error');
+          })
           .finally(function() { setLoading(false); });
       }, []);
 
@@ -2103,21 +2113,22 @@
       var _allRw = useState([]), allRewards = _allRw[0], setAllRewards = _allRw[1];
 
       useEffect(function() {
-        Promise.all([
+        Promise.allSettled([
           api('/referrals/admin/all'),
           api('/analytics/dashboard'),
           api('/auth/admin/users'),
           api('/restaurants/admin/all'),
           api('/rewards/admin/all'),
         ])
-          .then(function(res) {
-            setReferrals(res[0]);
-            setAnalytics(res[1]);
-            setUsers(res[2]);
-            setAdminRestaurants(res[3]);
-            setAllRewards(res[4]);
+          .then(function(results) {
+            if (results[0].status === 'fulfilled') setReferrals(results[0].value);
+            if (results[1].status === 'fulfilled') setAnalytics(results[1].value);
+            if (results[2].status === 'fulfilled') setUsers(results[2].value);
+            if (results[3].status === 'fulfilled') setAdminRestaurants(results[3].value);
+            if (results[4].status === 'fulfilled') setAllRewards(results[4].value);
+            var failed = results.filter(function(r) { return r.status === 'rejected'; });
+            if (failed.length === results.length) toast.addToast('Error al cargar panel admin', 'error');
           })
-          .catch(function(err) { toast.addToast('Error al cargar panel admin', 'error'); })
           .finally(function() { setLoading(false); });
       }, []);
 
