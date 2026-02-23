@@ -2478,14 +2478,13 @@
     function App() {
       var auth = useAuth();
       var hash = useHash();
-      var toast = useToast();
 
       if (auth.loading) return html`<${LoadingScreen} />`;
 
       // Public invite page (no auth required)
       if (hash.indexOf('/invite/') === 0) {
         var inviteCode = hash.split('/invite/')[1];
-        if (auth.user) { toast.addToast('Ya tienes una cuenta activa', 'warning'); navigate('/'); return null; }
+        if (auth.user) { navigate('/'); return null; }
         return html`<${InvitePage} code=${inviteCode} />`;
       }
 
